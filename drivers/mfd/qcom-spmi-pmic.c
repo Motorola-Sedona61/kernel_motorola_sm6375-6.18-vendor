@@ -6,6 +6,7 @@
  */
 
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/gfp.h>
