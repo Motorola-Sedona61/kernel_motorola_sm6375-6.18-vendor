@@ -4,6 +4,7 @@
  *
  */
 
+#include <linux/of.h>
 #include <dt-bindings/interconnect/qcom,blair.h>
 #include <linux/clk.h>
 #include <linux/device.h>
@@ -1784,8 +1785,8 @@ static void qnoc_remove(struct platform_device *pdev)
 
 	clk_bulk_disable_unprepare(qp->num_clks, qp->bus_clks);
 
+	icc_provider_deregister(&qp->provider);
 	icc_nodes_remove(&qp->provider);
-	icc_provider_del(&qp->provider);
 }
 
 static const struct of_device_id qnoc_of_match[] = {
