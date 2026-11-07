@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Out-of-tree Qualcomm/Motorola modules for the fogos 6.18 kernel.
 
+# The 6.1 kernel these drivers come from did not build with
+# -Wmissing-prototypes; 6.18 enables it by default.
+subdir-ccflags-y += -Wno-missing-prototypes
+
 obj-y += drivers/soc/qcom/
 obj-y += drivers/firmware/
 obj-y += drivers/pinctrl/qcom/
