@@ -78,7 +78,6 @@
 #define DWC3_GUSB3PIPECTL_DISRXDETU3	BIT(22)
 #define DWC3_GUCTL_SPRSCTRLTRANSEN	BIT(17)
 
-#define DWC3_LLUCTL	0xd024
 /* Force Gen1 speed on Gen2 link */
 #define DWC3_LLUCTL_FORCE_GEN1	BIT(10)
 
@@ -1188,9 +1187,9 @@ static int dwc3_core_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned int cmd,
 			dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0), reg);
 	}
 
-	dwc3_msm_ep_writel(dep->regs, DWC3_DEPCMDPAR0, params->param0);
-	dwc3_msm_ep_writel(dep->regs, DWC3_DEPCMDPAR1, params->param1);
-	dwc3_msm_ep_writel(dep->regs, DWC3_DEPCMDPAR2, params->param2);
+	dwc3_msm_ep_writel(dep->dwc->regs, DWC3_DEPCMDPAR0(dep->number), params->param0);
+	dwc3_msm_ep_writel(dep->dwc->regs, DWC3_DEPCMDPAR1(dep->number), params->param1);
+	dwc3_msm_ep_writel(dep->dwc->regs, DWC3_DEPCMDPAR2(dep->number), params->param2);
 
 	/*
 	 * Synopsys Databook 2.60a states in section 6.3.2.5.6 of that if we're
@@ -1213,9 +1212,9 @@ static int dwc3_core_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned int cmd,
 	else
 		cmd |= DWC3_DEPCMD_CMDACT;
 
-	dwc3_msm_ep_writel(dep->regs, DWC3_DEPCMD, cmd);
+	dwc3_msm_ep_writel(dep->dwc->regs, DWC3_DEPCMD(dep->number), cmd);
 	do {
-		reg = dwc3_msm_ep_readl(dep->regs, DWC3_DEPCMD);
+		reg = dwc3_msm_ep_readl(dep->dwc->regs, DWC3_DEPCMD(dep->number));
 		if (!(reg & DWC3_DEPCMD_CMDACT)) {
 			cmd_status = DWC3_DEPCMD_STATUS(reg);
 
@@ -1263,7 +1262,7 @@ static int dwc3_core_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned int cmd,
 		if (ret != -ETIMEDOUT) {
 			u32 res_id;
 
-			res_id = dwc3_msm_ep_readl(dep->regs, DWC3_DEPCMD);
+			res_id = dwc3_msm_ep_readl(dep->dwc->regs, DWC3_DEPCMD(dep->number));
 			dep->resource_index = DWC3_DEPCMD_GET_RSC_IDX(res_id);
 		}
 	}
@@ -1994,7 +1993,7 @@ static void gsi_get_channel_info(struct usb_ep *ep,
 
 	/* Provide physical USB addresses for DEPCMD and GEVENTCNT registers */
 	ch_info->depcmd_low_addr = (u32)(mdwc->reg_phys +
-				DWC3_DEP_BASE(dep->number) + DWC3_DEPCMD);
+				DWC3_DEPCMD(dep->number));
 
 	ch_info->depcmd_hi_addr = 0;
 
@@ -3689,7 +3688,7 @@ static void dwc3_dis_sleep_mode(struct dwc3_msm *mdwc)
 static void dwc3_force_gen1(struct dwc3_msm *mdwc)
 {
 	if (mdwc->force_gen1 && (mdwc->ip == DWC31_IP))
-		dwc3_msm_write_reg_field(mdwc->base, DWC3_LLUCTL, DWC3_LLUCTL_FORCE_GEN1, 1);
+		dwc3_msm_write_reg_field(mdwc->base, DWC3_LLUCTL(0), DWC3_LLUCTL_FORCE_GEN1, 1);
 }
 
 static int dwc3_msm_power_collapse_por(struct dwc3_msm *mdwc)
@@ -3824,7 +3823,7 @@ static void dwc3_msm_orientation_gpio_init(struct dwc3_msm *mdwc)
 	struct device *dev = mdwc->dev;
 	int rc;
 
-	mdwc->orientation_gpio = of_get_gpio(dev->of_node, 0);
+	mdwc->orientation_gpio = of_get_named_gpio(dev->of_node, "gpios", 0);
 	if (!gpio_is_valid(mdwc->orientation_gpio)) {
 		dev_err(dev, "Failed to get gpio\n");
 		return;
@@ -5485,7 +5484,8 @@ static ssize_t dynamic_disable_store(struct device *dev, struct device_attribute
 	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
 	bool disable;
 
-	strtobool(buf, &disable);
+	if (kstrtobool(buf, &disable))
+		return -EINVAL;
 	if (disable) {
 		if (mdwc->dynamic_disable) {
 			dbg_log_string("USB already disabled\n");
