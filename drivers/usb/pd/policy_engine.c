@@ -4196,7 +4196,7 @@ reset_drp:
 	return -ETIMEDOUT;
 }
 
-static int usbpd_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int usbpd_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
 	struct usbpd *pd = dev_get_drvdata(dev);
 	int i;
@@ -4995,7 +4995,6 @@ ATTRIBUTE_GROUPS(usbpd);
 
 static struct class usbpd_class = {
 	.name = "usbpd",
-	.owner = THIS_MODULE,
 	.dev_uevent = usbpd_uevent,
 	.dev_groups = usbpd_groups,
 };
@@ -5019,7 +5018,7 @@ struct usbpd *devm_usbpd_get_by_phandle(struct device *dev, const char *phandle)
 	struct platform_device *pdev;
 	struct device *pd_dev;
 
-	if (!usbpd_class.p) /* usbpd_init() not yet called */
+	if (!class_is_registered(&usbpd_class)) /* usbpd_init() not yet called */
 		return ERR_PTR(-EAGAIN);
 
 	if (!dev->of_node)
@@ -5122,8 +5121,7 @@ struct usbpd *usbpd_create(struct device *parent,
 	INIT_WORK(&pd->sm_work, usbpd_sm);
 	INIT_WORK(&pd->psy_chg_work, psy_changed_notifier_work);
 	INIT_WORK(&pd->start_periph_work, start_usb_peripheral_work);
-	hrtimer_init(&pd->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	pd->timer.function = pd_timeout;
+	hrtimer_setup(&pd->timer, pd_timeout, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	mutex_init(&pd->swap_lock);
 	mutex_init(&pd->svid_handler_lock);
 
