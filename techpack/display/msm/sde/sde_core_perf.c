@@ -310,7 +310,11 @@ static inline enum sde_crtc_client_type _get_sde_client_type(
 		return RT_CLIENT;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+/*
+ * The staling API is a Qualcomm addition to llcc-qcom.h. Without LLCC (Blair)
+ * the 6.1 header only had stubs, so take the empty versions below.
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) && IS_ENABLED(CONFIG_QCOM_LLCC)
 void sde_core_perf_llcc_stale_configure(struct sde_mdss_cfg *sde_cfg, struct llcc_slice_desc *slice)
 {
 	struct llcc_staling_mode_params params = {0};

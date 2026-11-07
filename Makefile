@@ -22,7 +22,8 @@ vendor_includes := -I$(VENDOR_SRC)/include -I$(VENDOR_SRC)/include/uapi \
 	-include $(autoconf)
 
 kbuild := $(MAKE) -C $(KERNEL_SRC) O=$(KERNEL_OUT) M=$(VENDOR_SRC) \
-	MO=$(VENDOR_OUT) NOSTDINC_FLAGS="$(vendor_includes)" $(config_vars) $(make_vars)
+	MO=$(VENDOR_OUT) NOSTDINC_FLAGS="$(vendor_includes)" $(config_vars) $(make_vars) \
+	DISPLAY_ROOT=$(VENDOR_SRC)/techpack/display
 
 modules: $(autoconf)
 	$(kbuild) modules

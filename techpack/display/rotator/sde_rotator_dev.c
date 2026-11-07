@@ -824,7 +824,7 @@ static int sde_rotator_queue_init(void *priv, struct vb2_queue *src_vq,
 	src_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
 	src_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	src_vq->lock = &ctx->rot_dev->lock;
-	src_vq->min_buffers_needed = 1;
+	src_vq->min_queued_buffers = 1;
 	src_vq->dev = ctx->rot_dev->dev;
 
 	ret = vb2_queue_init(src_vq);
@@ -842,7 +842,7 @@ static int sde_rotator_queue_init(void *priv, struct vb2_queue *src_vq,
 	dst_vq->buf_struct_size = sizeof(struct v4l2_m2m_buffer);
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	dst_vq->lock = &ctx->rot_dev->lock;
-	dst_vq->min_buffers_needed = 1;
+	dst_vq->min_queued_buffers = 1;
 	src_vq->dev = ctx->rot_dev->dev;
 
 	ret = vb2_queue_init(dst_vq);
@@ -951,7 +951,7 @@ struct sde_rotator_ctx *sde_rotator_ctx_open(
 	if (ctx->file) {
 		v4l2_fh_init(&ctx->fh, video);
 		file->private_data = &ctx->fh;
-		v4l2_fh_add(&ctx->fh);
+		v4l2_fh_add(&ctx->fh, ctx->file);
 
 		ctx->fh.m2m_ctx = v4l2_m2m_ctx_init(rot_dev->m2m_dev,
 			ctx, sde_rotator_queue_init);
@@ -1062,7 +1062,7 @@ error_kobj_init:
 	}
 error_m2m_init:
 	if (ctx->file) {
-		v4l2_fh_del(&ctx->fh);
+		v4l2_fh_del(&ctx->fh, ctx->file);
 		v4l2_fh_exit(&ctx->fh);
 	}
 	mutex_unlock(&rot_dev->lock);
@@ -1149,7 +1149,7 @@ static int sde_rotator_ctx_release(struct sde_rotator_ctx *ctx,
 		if (ctx->fh.m2m_ctx)
 			v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
 		if (ctx->fh.vdev) {
-			v4l2_fh_del(&ctx->fh);
+			v4l2_fh_del(&ctx->fh, ctx->file);
 			v4l2_fh_exit(&ctx->fh);
 		}
 	}
@@ -1925,8 +1925,8 @@ static int sde_rotator_querycap(struct file *file,
 	void *fh, struct v4l2_capability *cap)
 {
 	cap->bus_info[0] = 0;
-	strlcpy(cap->driver, SDE_ROTATOR_DRV_NAME, sizeof(cap->driver));
-	strlcpy(cap->card, SDE_ROTATOR_DRV_NAME, sizeof(cap->card));
+	strscpy(cap->driver, SDE_ROTATOR_DRV_NAME, sizeof(cap->driver));
+	strscpy(cap->card, SDE_ROTATOR_DRV_NAME, sizeof(cap->card));
 	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M |
 			V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_VIDEO_CAPTURE;
 	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
@@ -1974,7 +1974,7 @@ static int sde_rotator_enum_fmt_vid_cap(struct file *file,
 		return -EINVAL;
 
 	f->pixelformat = pixfmt;
-	strlcpy(f->description, fmt->description, sizeof(f->description));
+	strscpy(f->description, fmt->description, sizeof(f->description));
 
 	return 0;
 }
@@ -2019,7 +2019,7 @@ static int sde_rotator_enum_fmt_vid_out(struct file *file,
 		return -EINVAL;
 
 	f->pixelformat = pixfmt;
-	strlcpy(f->description, fmt->description, sizeof(f->description));
+	strscpy(f->description, fmt->description, sizeof(f->description));
 
 	return 0;
 }
@@ -3482,7 +3482,7 @@ static int sde_rotator_probe(struct platform_device *pdev)
 	vdev->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M |
 		V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_VIDEO_CAPTURE;
 
-	strlcpy(vdev->name, SDE_ROTATOR_DRV_NAME, sizeof(vdev->name));
+	strscpy(vdev->name, SDE_ROTATOR_DRV_NAME, sizeof(vdev->name));
 
 	ret = video_register_device(vdev, VFL_TYPE_VIDEO,
 			SDE_ROTATOR_BASE_DEVICE_NUMBER);
@@ -3539,7 +3539,7 @@ error_rotator_base_init:
  * sde_rotator_remove - rotator device remove method.
  * @pdev: Pointer rotator platform device.
  */
-static int sde_rotator_remove(struct platform_device *pdev)
+static void sde_rotator_remove(struct platform_device *pdev)
 {
 	struct sde_rotator_device *rot_dev;
 	int i;
@@ -3547,7 +3547,7 @@ static int sde_rotator_remove(struct platform_device *pdev)
 	rot_dev = platform_get_drvdata(pdev);
 	if (rot_dev == NULL) {
 		SDEDEV_ERR(&pdev->dev, "fail get rotator drvdata\n");
-		return 0;
+		return;
 	}
 
 	for (i = MAX_ROT_OPEN_SESSION - 1; i >= 0; i--)
@@ -3560,7 +3560,6 @@ static int sde_rotator_remove(struct platform_device *pdev)
 	sde_rotator_core_destroy(rot_dev->mgr);
 	sde_rotator_base_destroy(rot_dev->mdata);
 	kfree(rot_dev);
-	return 0;
 }
 
 static const struct dev_pm_ops sde_rotator_pm_ops = {
@@ -3624,5 +3623,5 @@ void sde_rotator_unregister(void)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0))
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 #endif

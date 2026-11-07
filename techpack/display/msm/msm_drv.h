@@ -1138,6 +1138,12 @@ struct msm_drm_private {
 	 */
 	struct task_struct *struct_mutex_task;
 
+	/*
+	 * The driver-wide lock that was drm_device.struct_mutex until DRM
+	 * removed it in 6.15. Only this driver ever took it.
+	 */
+	struct mutex struct_mutex;
+
 	/* list of clients waiting for events */
 	struct list_head client_event_list;
 
@@ -1339,7 +1345,8 @@ struct drm_framebuffer *msm_framebuffer_init(struct drm_device *dev,
 		const struct drm_mode_fb_cmd2 *mode_cmd,
 		struct drm_gem_object **bos);
 struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
-		struct drm_file *file, const struct drm_mode_fb_cmd2 *mode_cmd);
+		struct drm_file *file, const struct drm_format_info *info,
+		const struct drm_mode_fb_cmd2 *mode_cmd);
 int msm_framebuffer_set_cache_hint(struct drm_framebuffer *fb,
 		u32 flags, u32 rd_type, u32 wr_type);
 int msm_framebuffer_get_cache_hint(struct drm_framebuffer *fb,
@@ -1590,5 +1597,22 @@ int msm_get_dsc_count(struct msm_drm_private *priv,
 		u32 hdisplay, u32 *num_dsc);
 
 int msm_get_src_bpc(int chroma_format, int bpc);
+
+/*
+ * iommu_present(&platform_bus_type) is gone in 6.18. It asked whether an IOMMU
+ * driver had registered on the platform bus, which is always the case here:
+ * the Blair arm-smmu is loaded from vendor_boot before this module. (The
+ * upstream replacement, device_iommu_mapped() on the DRM device, would ask
+ * something else: this driver maps through context bank child devices.)
+ */
+static inline bool msm_iommu_present(void)
+{
+	return true;
+}
+
+static inline struct mutex *msm_struct_mutex(struct drm_device *dev)
+{
+	return &((struct msm_drm_private *)dev->dev_private)->struct_mutex;
+}
 
 #endif /* __MSM_DRV_H__ */

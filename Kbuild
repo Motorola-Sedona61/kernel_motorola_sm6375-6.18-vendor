@@ -46,3 +46,4 @@ obj-y += drivers/usb/phy/
 obj-y += drivers/usb/pd/
 obj-y += drivers/usb/dwc3/
 obj-y += motorola/
+obj-y += techpack/display/

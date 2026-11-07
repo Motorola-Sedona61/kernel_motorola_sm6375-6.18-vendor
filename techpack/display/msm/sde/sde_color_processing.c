@@ -6,6 +6,7 @@
 
 #define pr_fmt(fmt)	"[drm:%s:%d] " fmt, __func__, __LINE__
 
+#include <linux/vmalloc.h>
 #include <linux/dma-buf.h>
 #include <linux/string.h>
 #include <drm/msm_drm_pp.h>

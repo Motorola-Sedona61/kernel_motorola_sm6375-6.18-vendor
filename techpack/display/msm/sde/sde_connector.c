@@ -12,6 +12,7 @@
 #include "sde_connector.h"
 #include "sde_encoder.h"
 #include "msm_cooling_device.h"
+#include <linux/vmalloc.h>
 #include <linux/backlight.h>
 #include <linux/string.h>
 #include <linux/file.h>
@@ -2719,7 +2720,7 @@ static int sde_connector_get_modes(struct drm_connector *connector)
 
 static enum drm_mode_status
 sde_connector_mode_valid(struct drm_connector *connector,
-		struct drm_display_mode *mode)
+		const struct drm_display_mode *mode)
 {
 	struct sde_connector *c_conn;
 	struct msm_resource_caps_info avail_res;
@@ -2735,8 +2736,9 @@ sde_connector_mode_valid(struct drm_connector *connector,
 	memset(&avail_res, 0, sizeof(avail_res));
 	sde_connector_get_avail_res_info(connector, &avail_res);
 
+	/* The DRM callback takes a const mode since 6.x; the DSI and DP checks only read it. */
 	if (c_conn->ops.mode_valid)
-		return c_conn->ops.mode_valid(connector, mode, c_conn->display,
+		return c_conn->ops.mode_valid(connector, (struct drm_display_mode *)mode, c_conn->display,
 				&avail_res);
 
 	/* assume all modes okay by default */

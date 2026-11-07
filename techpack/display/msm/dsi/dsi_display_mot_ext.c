@@ -52,7 +52,7 @@ static int g_is_gsi_mode = 0;
 
 extern const char *cmd_set_prop_map[DSI_CMD_SET_MAX];
 
-static enum alarmtimer_restart dsi_display_wakeup_timer_func(struct alarm *alarm, ktime_t now)
+static void dsi_display_wakeup_timer_func(struct alarm *alarm, ktime_t now)
 {
 	ktime_t start, add;
 	int randomTime = 0;
@@ -62,13 +62,12 @@ static enum alarmtimer_restart dsi_display_wakeup_timer_func(struct alarm *alarm
 	if (g_wakeup_timer_interval != 0) {
 		//srand(time(NULL));
 		start = ktime_get_boottime();
-		randomTime = prandom_u32_max(g_wakeup_timer_interval) + g_wakeup_timer_interval;
+		randomTime = get_random_u32_below(g_wakeup_timer_interval) + g_wakeup_timer_interval;
 		add = ktime_set(randomTime, 0);
 		alarm_start(g_wakeup_timer, ktime_add(start, add));
 		pr_info("%s: randomTimer %d seconds set\n", __func__, randomTime);
 	}
 
-	return ALARMTIMER_NORESTART;
 }
 
 int mot_atoi(const char *src)

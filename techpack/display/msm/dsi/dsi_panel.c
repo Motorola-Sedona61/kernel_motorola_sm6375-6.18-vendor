@@ -4,6 +4,7 @@
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
+#include <linux/pinctrl/consumer.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/gpio.h>
@@ -2410,10 +2411,10 @@ int dsi_panel_parse_panel_cfg(struct dsi_panel *panel, bool is_primary)
 
 	if (!pname || strlen(pname) == 0) {
 		DSI_WARN("Failed to get mmi,panel_name\n");
-		strlcpy(panel->panel_name, DSI_PANEL_UNKNOWN_PANEL_NAME,
+		strscpy(panel->panel_name, DSI_PANEL_UNKNOWN_PANEL_NAME,
 				sizeof(panel->panel_name));
 	} else
-		strlcpy(panel->panel_name, pname, sizeof(panel->panel_name));
+		strscpy(panel->panel_name, pname, sizeof(panel->panel_name));
 
 	DSI_DEBUG("esd_utage_enable=%d\n", panel->esd_utag_enable);
 
@@ -5088,10 +5089,10 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 				"qcom,mdss-dsi-panel-supplier", NULL);
 	if (!pname || strlen(pname) == 0) {
 		DSI_WARN("Failed to get qcom,mdss-dsi-panel-supplier\n");
-		strlcpy(panel->panel_supplier, DSI_PANEL_UNKNOWN_PANEL_NAME,
+		strscpy(panel->panel_supplier, DSI_PANEL_UNKNOWN_PANEL_NAME,
 				sizeof(panel->panel_supplier));
 	} else
-		strlcpy(panel->panel_supplier, pname, sizeof(panel->panel_supplier));
+		strscpy(panel->panel_supplier, pname, sizeof(panel->panel_supplier));
 
 	/*
 	 * Set panel type to LCD as default.

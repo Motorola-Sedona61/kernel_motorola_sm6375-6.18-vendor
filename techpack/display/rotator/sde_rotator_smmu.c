@@ -6,6 +6,7 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
+#include <linux/of_device.h>
 #include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/kernel.h>
@@ -102,7 +103,7 @@ static int sde_smmu_util_parse_dt_clock(struct platform_device *pdev,
 	for (i = 0; i < mp->num_clk; i++) {
 		of_property_read_string_index(pdev->dev.of_node, "clock-names",
 							i, &clock_name);
-		strlcpy(mp->clk_config[i].clk_name, clock_name,
+		strscpy(mp->clk_config[i].clk_name, clock_name,
 				sizeof(mp->clk_config[i].clk_name));
 
 		of_property_read_u32_index(pdev->dev.of_node, "clock-rate",
@@ -562,7 +563,7 @@ int sde_smmu_probe(struct platform_device *pdev)
 		if (!mp->vreg_config)
 			return -ENOMEM;
 
-		strlcpy(mp->vreg_config->vreg_name, "gdsc-mdss",
+		strscpy(mp->vreg_config->vreg_name, "gdsc-mdss",
 				sizeof(mp->vreg_config->vreg_name));
 		mp->num_vreg = 1;
 	}
@@ -638,7 +639,7 @@ release_vreg:
 	return rc;
 }
 
-int sde_smmu_remove(struct platform_device *pdev)
+void sde_smmu_remove(struct platform_device *pdev)
 {
 	int i;
 	struct sde_smmu_client *sde_smmu;
@@ -660,7 +661,6 @@ int sde_smmu_remove(struct platform_device *pdev)
 		sde_smmu->mp.vreg_config = NULL;
 		sde_smmu->mp.num_vreg = 0;
 	}
-	return 0;
 }
 
 static struct platform_driver sde_smmu_driver = {
@@ -684,5 +684,5 @@ void sde_rotator_smmu_driver_unregister(void)
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0))
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 #endif

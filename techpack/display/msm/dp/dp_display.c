@@ -3859,12 +3859,12 @@ static void dp_display_set_mst_state(void *dp_display,
 		dp->mst.cbs.set_drv_state(g_dp_display, mst_state);
 }
 
-static int dp_display_remove(struct platform_device *pdev)
+static void dp_display_remove(struct platform_device *pdev)
 {
 	struct dp_display_private *dp;
 
 	if (!pdev)
-		return -EINVAL;
+		return;
 
 	dp = platform_get_drvdata(pdev);
 
@@ -3885,8 +3885,6 @@ static int dp_display_remove(struct platform_device *pdev)
 		ipc_log_context_destroy(g_dp_display->dp_aux_ipc_log);
 		g_dp_display->dp_aux_ipc_log = NULL;
 	}
-
-	return 0;
 }
 
 static int dp_pm_prepare(struct device *dev)
