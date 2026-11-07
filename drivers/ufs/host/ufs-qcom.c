@@ -12,6 +12,7 @@
 #include <linux/of.h>
 #include <linux/bitfield.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/phy/phy.h>
 #include <linux/gpio/consumer.h>
 #include <linux/reset-controller.h>
@@ -110,7 +111,7 @@ int ufsqcom_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
 		return -ENOMEM;
 
 	for (pos = 0; pos < len; pos += 4)
-		regs[pos / 4] = readl(hba->res[id].base + offset + pos);
+		regs[pos / 4] = readl(ufs_qcom_hba_res(hba)[id].base + offset + pos);
 
 	print_hex_dump(KERN_ERR, prefix,
 		       len > 4 ? DUMP_PREFIX_OFFSET : DUMP_PREFIX_NONE,
@@ -510,7 +511,7 @@ err:
 #endif
 
 static int ufs_qcom_get_pwr_dev_param(struct ufs_qcom_dev_params *qcom_param,
-				      struct ufs_pa_layer_attr *dev_max,
+				      const struct ufs_pa_layer_attr *dev_max,
 				      struct ufs_pa_layer_attr *agreed_pwr)
 {
 	int min_qcom_gear;
@@ -788,7 +789,7 @@ static int ufs_qcom_link_startup_post_change(struct ufs_hba *hba)
 	 * change sequence which may cause host PHY to go into bad state.
 	 * Disabling Rx LineCfg of host PHY should help avoid this.
 	 */
-	if (ufshcd_get_local_unipro_ver(hba) == UFS_UNIPRO_VER_1_41)
+	if (ufs_qcom_local_unipro_ver(hba) == UFS_UNIPRO_VER_1_41)
 		ufs_qcom_phy_ctrl_rx_linecfg(phy, false);
 
 	/*
@@ -1515,7 +1516,7 @@ static int ufs_qcom_link_startup_notify(struct ufs_hba *hba,
 		 * and device TX LCC are disabled once link startup is
 		 * completed.
 		 */
-		if (ufshcd_get_local_unipro_ver(hba) != UFS_UNIPRO_VER_1_41)
+		if (ufs_qcom_local_unipro_ver(hba) != UFS_UNIPRO_VER_1_41)
 			err = ufshcd_disable_host_tx_lcc(hba);
 		if (err)
 			goto out;
@@ -2416,15 +2417,53 @@ static void ufs_qcom_set_tx_hs_equalizer(struct ufs_hba *hba,
 	}
 }
 
+/*
+ * The 6.1 PRE_CHANGE negotiation: since 6.18 the core asks for it before
+ * the power mode change and passes the result to pwr_change_notify().
+ */
+static int ufs_qcom_negotiate_pwr_mode(struct ufs_hba *hba,
+				const struct ufs_pa_layer_attr *dev_max_params,
+				struct ufs_pa_layer_attr *dev_req_params)
+{
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	struct ufs_qcom_dev_params ufs_qcom_cap;
+	int ret;
+
+	ufs_qcom_cap.hs_rx_gear = host->limit_rx_hs_gear;
+	ufs_qcom_cap.hs_tx_gear = host->limit_tx_hs_gear;
+	ufs_qcom_cap.pwm_tx_gear = host->limit_tx_pwm_gear;
+	ufs_qcom_cap.pwm_rx_gear = host->limit_rx_pwm_gear;
+
+	ufs_qcom_cap.tx_lanes = UFS_QCOM_LIMIT_NUM_LANES_TX;
+	ufs_qcom_cap.rx_lanes = UFS_QCOM_LIMIT_NUM_LANES_RX;
+
+	ufs_qcom_cap.rx_pwr_pwm = UFS_QCOM_LIMIT_RX_PWR_PWM;
+	ufs_qcom_cap.tx_pwr_pwm = UFS_QCOM_LIMIT_TX_PWR_PWM;
+	ufs_qcom_cap.rx_pwr_hs = UFS_QCOM_LIMIT_RX_PWR_HS;
+	ufs_qcom_cap.tx_pwr_hs = UFS_QCOM_LIMIT_TX_PWR_HS;
+
+	ufs_qcom_cap.hs_rate = host->limit_rate;
+
+	ufs_qcom_cap.desired_working_mode =
+			UFS_QCOM_LIMIT_DESIRED_MODE;
+
+	ret = ufs_qcom_get_pwr_dev_param(&ufs_qcom_cap,
+			 dev_max_params,
+			 dev_req_params);
+	if (ret)
+		dev_err(hba->dev, "%s: failed to determine capabilities\n",
+			__func__);
+
+	return ret;
+}
+
 static int ufs_qcom_pwr_change_notify(struct ufs_hba *hba,
 				enum ufs_notify_change_status status,
-				struct ufs_pa_layer_attr *dev_max_params,
 				struct ufs_pa_layer_attr *dev_req_params)
 {
 	u32 val;
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	struct phy *phy = host->generic_phy;
-struct ufs_qcom_dev_params ufs_qcom_cap;
 	int ret = 0;
 
 	if (!dev_req_params) {
@@ -2435,33 +2474,6 @@ struct ufs_qcom_dev_params ufs_qcom_cap;
 
 	switch (status) {
 	case PRE_CHANGE:
-		ufs_qcom_cap.hs_rx_gear = host->limit_rx_hs_gear;
-		ufs_qcom_cap.hs_tx_gear = host->limit_tx_hs_gear;
-		ufs_qcom_cap.pwm_tx_gear = host->limit_tx_pwm_gear;
-		ufs_qcom_cap.pwm_rx_gear = host->limit_rx_pwm_gear;
-
-		ufs_qcom_cap.tx_lanes = UFS_QCOM_LIMIT_NUM_LANES_TX;
-		ufs_qcom_cap.rx_lanes = UFS_QCOM_LIMIT_NUM_LANES_RX;
-
-		ufs_qcom_cap.rx_pwr_pwm = UFS_QCOM_LIMIT_RX_PWR_PWM;
-		ufs_qcom_cap.tx_pwr_pwm = UFS_QCOM_LIMIT_TX_PWR_PWM;
-		ufs_qcom_cap.rx_pwr_hs = UFS_QCOM_LIMIT_RX_PWR_HS;
-		ufs_qcom_cap.tx_pwr_hs = UFS_QCOM_LIMIT_TX_PWR_HS;
-
-		ufs_qcom_cap.hs_rate = host->limit_rate;
-
-		ufs_qcom_cap.desired_working_mode =
-					UFS_QCOM_LIMIT_DESIRED_MODE;
-
-		ret = ufs_qcom_get_pwr_dev_param(&ufs_qcom_cap,
-						 dev_max_params,
-						 dev_req_params);
-		if (ret) {
-			dev_err(hba->dev, "%s: failed to determine capabilities\n",
-					__func__);
-			goto out;
-		}
-
 		/* enable the device ref clock before changing to HS mode */
 		if (!ufshcd_is_hs_mode(&hba->pwr_info) &&
 			ufshcd_is_hs_mode(dev_req_params))
@@ -2591,27 +2603,6 @@ static int ufs_qcom_quirk_host_pa_saveconfigtime(struct ufs_hba *hba)
 			    (pa_vs_config_reg1 | (1 << 12)));
 }
 
-static void ufs_qcom_override_pa_h8time(struct ufs_hba *hba)
-{
-	int ret;
-	u32 pa_h8time = 0;
-
-	ret = ufshcd_dme_get(hba, UIC_ARG_MIB(PA_HIBERN8TIME),
-				&pa_h8time);
-	if (ret) {
-		dev_err(hba->dev, "Failed getting PA_HIBERN8TIME: %d\n", ret);
-		return;
-	}
-
-
-	/* 1 implies 100 us */
-	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_HIBERN8TIME),
-				pa_h8time + 1);
-	if (ret)
-		dev_err(hba->dev, "Failed updating PA_HIBERN8TIME: %d\n", ret);
-
-}
-
 static inline bool
 ufshcd_is_valid_pm_lvl(enum ufs_pm_level lvl)
 {
@@ -2653,6 +2644,28 @@ static void ufs_qcom_override_pa_tx_hsg1_sync_len(struct ufs_hba *hba)
 			     err, sync_len_val);
 }
 
+static int ufs_qcom_vcc_off_notify(struct notifier_block *nb,
+				   unsigned long event, void *data)
+{
+	if (event & REGULATOR_EVENT_DISABLE)
+		usleep_range(5000, 5100);
+
+	return NOTIFY_OK;
+}
+
+static void ufs_qcom_delay_after_vcc_off(struct ufs_hba *hba)
+{
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+	struct ufs_vreg *vcc = hba->vreg_info.vcc;
+
+	if (host->vcc_off_nb.notifier_call || !vcc || IS_ERR_OR_NULL(vcc->reg))
+		return;
+
+	host->vcc_off_nb.notifier_call = ufs_qcom_vcc_off_notify;
+	if (devm_regulator_register_notifier(vcc->reg, &host->vcc_off_nb))
+		host->vcc_off_nb.notifier_call = NULL;
+}
+
 static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 {
 	unsigned long flags;
@@ -2660,7 +2673,7 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	/* Set the rpm auto suspend delay to 3s */
-	hba->host->hostt->rpm_autosuspend_delay = UFS_QCOM_AUTO_SUSPEND_DELAY;
+	hba->host->rpm_autosuspend_delay = UFS_QCOM_AUTO_SUSPEND_DELAY;
 	/* Set the default auto-hiberate idle timer value to 5ms */
 	hba->ahit = FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, 5) |
 		    FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, 3);
@@ -2674,9 +2687,6 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_WDC)
 		hba->dev_quirks |= UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE;
 
-	if (hba->dev_quirks & UFS_DEVICE_QUIRK_PA_HIBER8TIME)
-		ufs_qcom_override_pa_h8time(hba);
-
 	if (hba->dev_quirks & UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH)
 		ufs_qcom_override_pa_tx_hsg1_sync_len(hba);
 
@@ -2684,6 +2694,13 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_MICRON)
 		hba->dev_quirks |= UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM;
+
+	/*
+	 * 6.1 waited 5 ms after turning VCC off for these devices
+	 * (UFS_DEVICE_QUIRK_DELAY_AFTER_LPM), which 6.18 dropped.
+	 */
+	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_TOSHIBA)
+		ufs_qcom_delay_after_vcc_off(hba);
 
 	return err;
 }
@@ -2736,7 +2753,7 @@ static void ufs_qcom_advertise_quirks(struct ufs_hba *hba)
 		hba->quirks |= UFSHCD_QUIRK_BROKEN_AUTO_HIBERN8;
 
 #if IS_ENABLED(CONFIG_SCSI_UFS_CRYPTO_QTI)
-	hba->android_quirks |= UFSHCD_ANDROID_QUIRK_CUSTOM_CRYPTO_PROFILE;
+	hba->quirks |= UFSHCD_QUIRK_CUSTOM_CRYPTO_PROFILE;
 #endif
 }
 
@@ -2814,7 +2831,7 @@ static void ufs_qcom_wait_for_cq_hp_update(struct ufs_hba *hba)
 	 * Loop and Sleep until the CQ Head update is done.
 	 * See ufs_qcom_esi_handler().
 	 */
-	if (is_mcq_enabled(hba)) {
+	if (hba->mcq_enabled) {
 		while (atomic_read(&host->cqhp_update_pending))
 			/* Wait for 10 - 20 msec */
 			usleep_range(10 * 1000, 20 * 1000);
@@ -2968,265 +2985,6 @@ static const struct reset_control_ops ufs_qcom_reset_ops = {
 	.assert = ufs_qcom_reset_assert,
 	.deassert = ufs_qcom_reset_deassert,
 };
-
-/**
- * ufs_qcom_query_ioctl - perform user read queries
- * @hba: per-adapter instance
- * @lun: used for lun specific queries
- * @buffer: user space buffer for reading and submitting query data and params
- * @return: 0 for success negative error code otherwise
- *
- * Expected/Submitted buffer structure is struct ufs_ioctl_query_data.
- * It will read the opcode, idn and buf_length parameters, and, put the
- * response in the buffer field while updating the used size in buf_length.
- */
-static int
-ufs_qcom_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
-{
-	struct ufs_ioctl_query_data *ioctl_data;
-	int err = 0;
-	int length = 0;
-	void *data_ptr;
-	bool flag;
-	u32 att;
-	u8 index;
-	u8 *desc = NULL;
-
-	ioctl_data = kzalloc(sizeof(*ioctl_data), GFP_KERNEL);
-	if (!ioctl_data) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	/* extract params from user buffer */
-	err = copy_from_user(ioctl_data, buffer,
-			     sizeof(struct ufs_ioctl_query_data));
-	if (err) {
-		dev_err(hba->dev,
-			"%s: Failed copying buffer from user, err %d\n",
-			__func__, err);
-		goto out_release_mem;
-	}
-
-#if defined(CONFIG_UFSFEATURE)
-	if (ufsf_check_query(ioctl_data->opcode)) {
-		err = ufsf_query_ioctl(ufs_qcom_get_ufsf(hba), lun, buffer,
-				       ioctl_data, UFSFEATURE_SELECTOR);
-		goto out_release_mem;
-	}
-#endif
-
-	/* verify legal parameters & send query */
-	switch (ioctl_data->opcode) {
-	case UPIU_QUERY_OPCODE_READ_DESC:
-		switch (ioctl_data->idn) {
-		case QUERY_DESC_IDN_DEVICE:
-		case QUERY_DESC_IDN_CONFIGURATION:
-		case QUERY_DESC_IDN_INTERCONNECT:
-		case QUERY_DESC_IDN_GEOMETRY:
-		case QUERY_DESC_IDN_POWER:
-			index = 0;
-			break;
-		case QUERY_DESC_IDN_UNIT:
-			if (!ufs_is_valid_unit_desc_lun(&hba->dev_info, lun)) {
-				dev_err(hba->dev,
-					"%s: No unit descriptor for lun 0x%x\n",
-					__func__, lun);
-				err = -EINVAL;
-				goto out_release_mem;
-			}
-			index = lun;
-			break;
-		default:
-			goto out_einval;
-		}
-		length = min_t(int, QUERY_DESC_MAX_SIZE,
-			       ioctl_data->buf_size);
-		desc = kzalloc(length, GFP_KERNEL);
-		if (!desc) {
-			dev_err(hba->dev, "%s: Failed allocating %d bytes\n",
-				__func__, length);
-			err = -ENOMEM;
-			goto out_release_mem;
-		}
-		err = ufshcd_query_descriptor_retry(hba, ioctl_data->opcode,
-						    ioctl_data->idn, index, 0,
-						    desc, &length);
-		break;
-	case UPIU_QUERY_OPCODE_READ_ATTR:
-		switch (ioctl_data->idn) {
-		case QUERY_ATTR_IDN_BOOT_LU_EN:
-		case QUERY_ATTR_IDN_POWER_MODE:
-		case QUERY_ATTR_IDN_ACTIVE_ICC_LVL:
-		case QUERY_ATTR_IDN_OOO_DATA_EN:
-		case QUERY_ATTR_IDN_BKOPS_STATUS:
-		case QUERY_ATTR_IDN_PURGE_STATUS:
-		case QUERY_ATTR_IDN_MAX_DATA_IN:
-		case QUERY_ATTR_IDN_MAX_DATA_OUT:
-		case QUERY_ATTR_IDN_REF_CLK_FREQ:
-		case QUERY_ATTR_IDN_CONF_DESC_LOCK:
-		case QUERY_ATTR_IDN_MAX_NUM_OF_RTT:
-		case QUERY_ATTR_IDN_EE_CONTROL:
-		case QUERY_ATTR_IDN_EE_STATUS:
-		case QUERY_ATTR_IDN_SECONDS_PASSED:
-			index = 0;
-			break;
-		case QUERY_ATTR_IDN_DYN_CAP_NEEDED:
-		case QUERY_ATTR_IDN_CORR_PRG_BLK_NUM:
-			index = lun;
-			break;
-		default:
-			goto out_einval;
-		}
-		err = ufshcd_query_attr(hba, ioctl_data->opcode,
-					ioctl_data->idn, index, 0, &att);
-		break;
-
-	case UPIU_QUERY_OPCODE_WRITE_ATTR:
-		err = copy_from_user(&att,
-				     buffer +
-				     sizeof(struct ufs_ioctl_query_data),
-				     sizeof(u32));
-		if (err) {
-			dev_err(hba->dev,
-				"%s: Failed copying buffer from user, err %d\n",
-				__func__, err);
-			goto out_release_mem;
-		}
-
-		switch (ioctl_data->idn) {
-		case QUERY_ATTR_IDN_BOOT_LU_EN:
-			index = 0;
-			if (!att) {
-				dev_err(hba->dev,
-					"%s: Illegal ufs query ioctl data, opcode 0x%x, idn 0x%x, att 0x%x\n",
-					__func__, ioctl_data->opcode,
-					(unsigned int)ioctl_data->idn, att);
-				err = -EINVAL;
-				goto out_release_mem;
-			}
-			break;
-		default:
-			goto out_einval;
-		}
-		err = ufshcd_query_attr(hba, ioctl_data->opcode,
-					ioctl_data->idn, index, 0, &att);
-		break;
-
-	case UPIU_QUERY_OPCODE_READ_FLAG:
-		switch (ioctl_data->idn) {
-		case QUERY_FLAG_IDN_FDEVICEINIT:
-		case QUERY_FLAG_IDN_PERMANENT_WPE:
-		case QUERY_FLAG_IDN_PWR_ON_WPE:
-		case QUERY_FLAG_IDN_BKOPS_EN:
-		case QUERY_FLAG_IDN_PURGE_ENABLE:
-		case QUERY_FLAG_IDN_FPHYRESOURCEREMOVAL:
-		case QUERY_FLAG_IDN_BUSY_RTC:
-			break;
-		default:
-			goto out_einval;
-		}
-		err = ufshcd_query_flag(hba, ioctl_data->opcode,
-					ioctl_data->idn, 0, &flag);
-		break;
-	default:
-		goto out_einval;
-	}
-
-	if (err) {
-		dev_err(hba->dev, "%s: Query for idn %d failed\n", __func__,
-			ioctl_data->idn);
-		goto out_release_mem;
-	}
-
-	/*
-	 * copy response data
-	 * As we might end up reading less data than what is specified in
-	 * "ioctl_data->buf_size". So we are updating "ioctl_data->
-	 * buf_size" to what exactly we have read.
-	 */
-	switch (ioctl_data->opcode) {
-	case UPIU_QUERY_OPCODE_READ_DESC:
-		ioctl_data->buf_size = min_t(int, ioctl_data->buf_size, length);
-		data_ptr = desc;
-		break;
-	case UPIU_QUERY_OPCODE_READ_ATTR:
-		ioctl_data->buf_size = sizeof(u32);
-		data_ptr = &att;
-		break;
-	case UPIU_QUERY_OPCODE_READ_FLAG:
-		ioctl_data->buf_size = 1;
-		data_ptr = &flag;
-		break;
-	case UPIU_QUERY_OPCODE_WRITE_ATTR:
-		goto out_release_mem;
-	default:
-		goto out_einval;
-	}
-
-	/* copy to user */
-	err = copy_to_user(buffer, ioctl_data,
-			   sizeof(struct ufs_ioctl_query_data));
-	if (err)
-		dev_err(hba->dev, "%s: Failed copying back to user.\n",
-			__func__);
-	err = copy_to_user(buffer + sizeof(struct ufs_ioctl_query_data),
-			   data_ptr, ioctl_data->buf_size);
-	if (err)
-		dev_err(hba->dev, "%s: err %d copying back to user.\n",
-			__func__, err);
-	goto out_release_mem;
-
-out_einval:
-	dev_err(hba->dev,
-		"%s: illegal ufs query ioctl data, opcode 0x%x, idn 0x%x\n",
-		__func__, ioctl_data->opcode, (unsigned int)ioctl_data->idn);
-	err = -EINVAL;
-out_release_mem:
-	kfree(ioctl_data);
-	kfree(desc);
-out:
-	return err;
-}
-
-/**
- * ufs_qcom_ioctl - ufs ioctl callback registered in scsi_host
- * @dev: scsi device required for per LUN queries
- * @cmd: command opcode
- * @buffer: user space buffer for transferring data
- *
- * Supported commands:
- * UFS_IOCTL_QUERY
- */
-static int
-ufs_qcom_ioctl(struct scsi_device *dev, unsigned int cmd, void __user *buffer)
-{
-	struct ufs_hba *hba = shost_priv(dev->host);
-	int err = 0;
-
-	BUG_ON(!hba);
-	if (!buffer) {
-		dev_err(hba->dev, "%s: User buffer is NULL!\n", __func__);
-		return -EINVAL;
-	}
-
-	switch (cmd) {
-	case UFS_IOCTL_QUERY:
-		ufshcd_rpm_get_sync(hba);
-		err = ufs_qcom_query_ioctl(hba,
-					   ufshcd_scsi_to_upiu_lun(dev->lun),
-					   buffer);
-		ufshcd_rpm_put_sync(hba);
-		break;
-	default:
-		err = -ENOIOCTLCMD;
-		dev_err(hba->dev, "%s: Unsupported ioctl cmd %d\n", __func__,
-			cmd);
-		break;
-	}
-
-	return err;
-}
 
 #ifndef MODULE
 static int __init get_android_boot_dev(char *str)
@@ -3972,9 +3730,6 @@ static int ufs_qcom_panic_handler(struct notifier_block *nb,
 	dev_err(hba->dev, "last_hibern8_exit_tstamp at %lld us, hibern8_exit_cnt=%d\n",
 		ktime_to_us(hba->ufs_stats.last_hibern8_exit_tstamp),
 		hba->ufs_stats.hibern8_exit_cnt);
-	dev_err(hba->dev, "last intr at %lld us, last intr status=0x%x\n",
-		ktime_to_us(hba->ufs_stats.last_intr_ts),
-		hba->ufs_stats.last_intr_status);
 	dev_err(hba->dev, "error handling flags=0x%x, req. abort count=%d\n",
 		hba->eh_flags, hba->req_abort_count);
 	dev_err(hba->dev, "hba->ufs_version=0x%x, Host capabilities=0x%x, caps=0x%x\n",
@@ -4320,14 +4075,6 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 			dev_err(host->hba->dev, "Fail to register UFS panic notifier\n");
 	}
 
-	/* Provide SCSI host ioctl API */
-	hba->host->hostt->ioctl = (int (*)(struct scsi_device *, unsigned int,
-				   void __user *))ufs_qcom_ioctl;
-#ifdef CONFIG_COMPAT
-	hba->host->hostt->compat_ioctl = (int (*)(struct scsi_device *,
-					  unsigned int,
-					  void __user *))ufs_qcom_ioctl;
-#endif
 	return 0;
 
 out_disable_vccq_parent:
@@ -4528,8 +4275,8 @@ static bool is_hba_active(struct ufs_hba *hba)
 	return !!(ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE);
 }
 
-static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba,
-		bool scale_up, enum ufs_notify_change_status status)
+static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba, bool scale_up,
+		unsigned long target_freq, enum ufs_notify_change_status status)
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	struct ufs_pa_layer_attr *dev_req_params = &host->dev_req_params;
@@ -5216,7 +4963,7 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba)
 	ufshcd_dump_regs(hba, UFS_MEM_ICE, 29 * 4,
 			 "HCI Shared ICE Registers ");
 
-	if (is_mcq_enabled(hba))
+	if (hba->mcq_enabled)
 		ufs_qcom_dump_mcq_dbg_regs(hba);
 
 	/* sleep a bit intermittently as we are dumping too much data */
@@ -5228,7 +4975,7 @@ static void ufs_qcom_dump_dbg_regs(struct ufs_hba *hba)
 	if (in_task()) {
 		usleep_range(1000, 1100);
 
-		if (is_mcq_enabled(hba)) {
+		if (hba->mcq_enabled) {
 			ufs_qcom_dump_mcq_hci_regs(hba);
 			usleep_range(1000, 1100);
 		}
@@ -5425,9 +5172,6 @@ static struct ufs_dev_quirk ufs_qcom_dev_fixups[] = {
 	{ .wmanufacturerid = UFS_VENDOR_WDC,
 	  .model = UFS_ANY_MODEL,
 	  .quirk = UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE },
-	{ .wmanufacturerid = UFS_VENDOR_TOSHIBA,
-	  .model = UFS_ANY_MODEL,
-	  .quirk = UFS_DEVICE_QUIRK_DELAY_AFTER_LPM },
 	{}
 };
 
@@ -5468,10 +5212,10 @@ static int ufs_qcom_mcq_config_resource(struct ufs_hba *hba)
 	struct resource *res_mem, *res_mcq;
 	int i, ret = 0;
 
-	memcpy(hba->res, ufs_res_info, sizeof(ufs_res_info));
+	memcpy(ufs_qcom_hba_res(hba), ufs_res_info, sizeof(ufs_res_info));
 
 	for (i = 0; i < RES_MAX; i++) {
-		res = &hba->res[i];
+		res = &ufs_qcom_hba_res(hba)[i];
 		res->resource = platform_get_resource_byname(pdev,
 							     IORESOURCE_MEM,
 							     res->name);
@@ -5497,7 +5241,7 @@ static int ufs_qcom_mcq_config_resource(struct ufs_hba *hba)
 	}
 
 	/* MCQ resource provided in DT */
-	res = &hba->res[RES_MCQ];
+	res = &ufs_qcom_hba_res(hba)[RES_MCQ];
 	/* Bail if MCQ resource is provided */
 	if (res->base)
 		goto out;
@@ -5543,8 +5287,8 @@ static int ufs_qcom_op_runtime_config(struct ufs_hba *hba)
 	struct ufshcd_mcq_opr_info_t *opr;
 	int i;
 
-	mem_res = &hba->res[RES_UFS];
-	sqdao_res = &hba->res[RES_MCQ_SQD];
+	mem_res = &ufs_qcom_hba_res(hba)[RES_UFS];
+	sqdao_res = &ufs_qcom_hba_res(hba)[RES_MCQ_SQD];
 
 	if (!mem_res->base || !sqdao_res->base)
 		return -EINVAL;
@@ -5569,7 +5313,7 @@ static int ufs_qcom_get_hba_mac(struct ufs_hba *hba)
 static int ufs_qcom_get_outstanding_cqs(struct ufs_hba *hba,
 					unsigned long *ocqs)
 {
-	struct ufshcd_res_info *mcq_vs_res = &hba->res[RES_MCQ_VS];
+	struct ufshcd_res_info *mcq_vs_res = &ufs_qcom_hba_res(hba)[RES_MCQ_VS];
 
 	if (!mcq_vs_res->base)
 		return -EINVAL;
@@ -5620,7 +5364,7 @@ static int ufs_qcom_config_esi(struct ufs_hba *hba)
 	 * 2. Poll queues do not need ESI.
 	 */
 	nr_irqs = hba->nr_hw_queues - hba->nr_queues[HCTX_TYPE_POLL];
-	ret = platform_msi_domain_alloc_irqs(hba->dev, nr_irqs,
+	ret = platform_device_msi_init_and_alloc_irqs(hba->dev, nr_irqs,
 					     ufs_qcom_write_msi_msg);
 	if (ret) {
 		dev_err(hba->dev, "Failed to request Platform MSI %d\n", ret);
@@ -5650,7 +5394,7 @@ static int ufs_qcom_config_esi(struct ufs_hba *hba)
 			devm_free_irq(hba->dev, desc->irq, hba);
 		}
 		ufs_qcom_msi_unlock_descs(hba);
-		platform_msi_domain_free_irqs(hba->dev);
+		platform_device_msi_free_irqs_all(hba->dev);
 	} else {
 		if (host->hw_ver.major == 6 && host->hw_ver.minor == 0 &&
 		    host->hw_ver.step == 0) {
@@ -5688,6 +5432,7 @@ static const struct ufs_hba_variant_ops ufs_hba_qcom_vops = {
 	.setup_clocks           = ufs_qcom_setup_clocks,
 	.hce_enable_notify      = ufs_qcom_hce_enable_notify,
 	.link_startup_notify    = ufs_qcom_link_startup_notify,
+	.negotiate_pwr_mode	= ufs_qcom_negotiate_pwr_mode,
 	.pwr_change_notify	= ufs_qcom_pwr_change_notify,
 	.hibern8_notify		= ufs_qcom_hibern8_notify,
 	.apply_dev_quirks	= ufs_qcom_apply_dev_quirks,
@@ -5696,7 +5441,6 @@ static const struct ufs_hba_variant_ops ufs_hba_qcom_vops = {
 	.dbg_register_dump	= ufs_qcom_dump_dbg_regs,
 	.device_reset		= ufs_qcom_device_reset,
 	.config_scaling_param = ufs_qcom_config_scaling_param,
-	.program_key		= ufs_qcom_ice_program_key,
 	.fixup_dev_quirks       = ufs_qcom_fixup_dev_quirks,
 	.mcq_config_resource	= ufs_qcom_mcq_config_resource,
 	.get_hba_mac		= ufs_qcom_get_hba_mac,
@@ -5911,7 +5655,7 @@ static ssize_t hibern8_count_show(struct device *dev,
 	struct ufs_hba *hba = dev_get_drvdata(dev);
 
 	pm_runtime_get_sync(hba->dev);
-	ufshcd_hold(hba, false);
+	ufshcd_hold(hba);
 	hw_h8_enter = ufshcd_readl(hba, REG_UFS_HW_H8_ENTER_CNT);
 	sw_h8_enter = ufshcd_readl(hba, REG_UFS_SW_H8_ENTER_CNT);
 	sw_hw_h8_enter = ufshcd_readl(hba, REG_UFS_SW_AFTER_HW_H8_ENTER_CNT);
@@ -6039,7 +5783,7 @@ static void ufs_qcom_hook_send_command(void *param, struct ufs_hba *hba,
 
 		ufs_qcom_qos(hba, lrbp->task_tag);
 
-		if (!is_mcq_enabled(hba)) {
+		if (!hba->mcq_enabled) {
 			ufs_qcom_log_str(host, "<,%x,%d,%x,%d\n",
 							lrbp->cmd->cmnd[0],
 							lrbp->task_tag,
@@ -6098,7 +5842,7 @@ static void ufs_qcom_hook_compl_command(void *param, struct ufs_hba *hba,
 		struct request *rq = scsi_cmd_to_rq(lrbp->cmd);
 		int sz = rq ? blk_rq_sectors(rq) : 0;
 
-		if (!is_mcq_enabled(hba)) {
+		if (!hba->mcq_enabled) {
 			ufs_qcom_log_str(host, ">,%x,%d,%x,%d\n",
 							lrbp->cmd->cmnd[0],
 							lrbp->task_tag,
@@ -6379,7 +6123,7 @@ static void ufs_qcom_remove(struct platform_device *pdev)
 				&host->ufs_qcom_panic_nb);
 
 	ufshcd_remove(hba);
-	platform_msi_domain_free_irqs(hba->dev);
+	platform_device_msi_free_irqs_all(hba->dev);
 }
 
 /**
@@ -6424,7 +6168,10 @@ static void ufs_qcom_shutdown(struct platform_device *pdev)
 	/* put an additional vote on UFS VCCQ LDO if required */
 	ufs_qcom_enable_vccq_shutdown(hba);
 
-	ufshcd_pltfrm_shutdown(pdev);
+	/*
+	 * The core shut the controller down already, from the shutdown of
+	 * the UFS device W-LU (ufshcd_shutdown() was folded into it).
+	 */
 
 	/* UFS_RESET TLMM register cannot reset to POR value '1' after warm
 	 * reset, so deassert ufs device reset line after UFS device shutdown

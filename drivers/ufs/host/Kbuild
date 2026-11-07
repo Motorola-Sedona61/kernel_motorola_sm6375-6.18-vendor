@@ -4,6 +4,8 @@
 # This directory first, then the kernel subsystem's private headers,
 # as for an in-tree build.
 ccflags-y += -I$(src) -I$(srctree)/drivers/ufs/host
+# Core private headers are included from the kernel root.
+ccflags-y += -I$(srctree)
 
 obj-$(CONFIG_SCSI_UFS_QCOM) += ufs_qcom.o
 ufs_qcom-y := ufs-qcom.o ufs-qcom-ice.o

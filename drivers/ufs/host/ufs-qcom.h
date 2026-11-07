@@ -280,7 +280,6 @@ enum ufs_qcom_phy_init_type {
  * Some ufs devices may need more time to be in hibern8 before exiting.
  * Enable this quirk to give it an additional 100us.
  */
-#define UFS_DEVICE_QUIRK_PA_HIBER8TIME          (1 << 15)
 
 /*
  * Some ufs device vendors need a different TSync length.
@@ -531,7 +530,31 @@ struct cpu_freq_info {
 	unsigned int max_cpu_scale_freq;
 };
 
+/*
+ * MCQ register ranges. 6.18 removed hba->res[] (it only keeps
+ * hba->mcq_base), so the host keeps the 6.1 table itself.
+ */
+struct ufshcd_res_info {
+	const char *name;
+	struct resource *resource;
+	void __iomem *base;
+};
+
+enum ufshcd_res {
+	RES_UFS,
+	RES_MCQ,
+	RES_MCQ_SQD,
+	RES_MCQ_SQIS,
+	RES_MCQ_CQD,
+	RES_MCQ_CQIS,
+	RES_MCQ_VS,
+	RES_MAX,
+};
+
 struct ufs_qcom_host {
+	struct ufshcd_res_info res[RES_MAX];
+	/* 5 ms delay after VCC is turned off, see ufs_qcom_apply_dev_quirks() */
+	struct notifier_block vcc_off_nb;
 	/*
 	 * Set this capability if host controller supports the QUniPro mode
 	 * and if driver wants the Host controller to operate in QUniPro mode.
@@ -669,6 +692,19 @@ struct ufs_qcom_host {
 #endif
 };
 
+/* ufshcd_get_local_unipro_ver() of 6.1: HCI 1.0 and 1.1 use UniPro 1.41. */
+static inline u32 ufs_qcom_local_unipro_ver(struct ufs_hba *hba)
+{
+	if (hba->ufs_version <= ufshci_version(1, 1))
+		return UFS_UNIPRO_VER_1_41;
+	return UFS_UNIPRO_VER_1_6;
+}
+
+static inline struct ufshcd_res_info *ufs_qcom_hba_res(struct ufs_hba *hba)
+{
+	return ((struct ufs_qcom_host *)ufshcd_get_variant(hba))->res;
+}
+
 static inline u32
 ufs_qcom_get_debug_reg_offset(struct ufs_qcom_host *host, u32 reg)
 {
@@ -705,32 +741,6 @@ static inline bool ufs_qcom_cap_svs2(struct ufs_qcom_host *host)
 static inline bool is_shared_ice_supported(struct ufs_qcom_host *host)
 {
 	return !!(host->caps & UFS_QCOM_CAP_SHARED_ICE);
-}
-
-/**
- * ufshcd_dme_rmw - get modify set a dme attribute
- * @hba - per adapter instance
- * @mask - mask to apply on read value
- * @val - actual value to write
- * @attr - dme attribute
- */
-static inline int ufshcd_dme_rmw(struct ufs_hba *hba, u32 mask,
-				 u32 val, u32 attr)
-{
-	u32 cfg = 0;
-	int err = 0;
-
-	err = ufshcd_dme_get(hba, UIC_ARG_MIB(attr), &cfg);
-	if (err)
-		goto out;
-
-	cfg &= ~mask;
-	cfg |= (val & mask);
-
-	err = ufshcd_dme_set(hba, UIC_ARG_MIB(attr), cfg);
-
-out:
-	return err;
 }
 
 /*
@@ -821,13 +831,12 @@ static inline void ufs_qcom_ice_debug(struct ufs_qcom_host *host)
 
 static inline void ufs_qcom_msi_lock_descs(struct ufs_hba *hba)
 {
-	mutex_lock(&hba->dev->msi.data->mutex);
+	__msi_lock_descs(hba->dev);
 }
 
 static inline void ufs_qcom_msi_unlock_descs(struct ufs_hba *hba)
 {
-	hba->dev->msi.data->__iter_idx = MSI_MAX_INDEX;
-	mutex_unlock(&hba->dev->msi.data->mutex);
+	__msi_unlock_descs(hba->dev);
 }
 
 #if defined(CONFIG_UFSFEATURE)
