@@ -7,7 +7,7 @@
 #define _UFSHCD_CRYPTO_H
 
 #include <scsi/scsi_cmnd.h>
-#include "ufshcd.h"
+#include <ufs/ufshcd.h>
 #include "ufshcd-priv.h"
 #include "ufshci.h"
 
