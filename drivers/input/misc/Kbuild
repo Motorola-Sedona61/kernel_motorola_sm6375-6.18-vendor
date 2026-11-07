@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
+# Private headers of the kernel subsystem, as for an in-tree build.
+ccflags-y += -I$(srctree)/drivers/input/misc
+
 obj-$(CONFIG_INPUT_PM8941_PWRKEY) += pm8941-pwrkey.o
 obj-$(CONFIG_INPUT_QPNP_POWER_ON) += qpnp-power-on.o

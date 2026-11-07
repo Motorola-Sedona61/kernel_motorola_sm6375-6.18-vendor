@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
+# Private headers of the kernel subsystem, as for an in-tree build.
+ccflags-y += -I$(srctree)/drivers/phy/qualcomm
+
 obj-$(CONFIG_PHY_QCOM_UFS) += phy-qcom-ufs.o
 obj-$(CONFIG_PHY_QCOM_UFS_V3_SM4350) += phy-qcom-ufs-qmp-v3.o
 obj-$(CONFIG_PHY_QCOM_UFS_V4_BLAIR) += phy-qcom-ufs-qmp-v4-blair.o

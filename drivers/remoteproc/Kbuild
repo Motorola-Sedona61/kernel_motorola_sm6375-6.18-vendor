@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
+# Private headers of the kernel subsystem, as for an in-tree build.
+ccflags-y += -I$(srctree)/drivers/remoteproc
+
 obj-$(CONFIG_QCOM_RPROC_COMMON) += rproc_qcom_common.o
 rproc_qcom_common-y := qcom_common.o qcom_tracepoints.o

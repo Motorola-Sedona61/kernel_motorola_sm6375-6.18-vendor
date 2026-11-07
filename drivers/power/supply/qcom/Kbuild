@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
+# Private headers of the kernel subsystem, as for an in-tree build.
+ccflags-y += -I$(srctree)/drivers/power/supply/qcom
+
 obj-$(CONFIG_QPNP_QG) += qcom-qpnp-qg.o
 qcom-qpnp-qg-y := qpnp-qg.o battery-profile-loader.o qg-util.o qg-soc.o qg-sdam.o qg-battery-profile.o qg-profile-lib.o fg-alg.o
 obj-$(CONFIG_QPNP_SMB5) += qpnp-smb5-main.o

@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
+# Private headers of the kernel subsystem, as for an in-tree build.
+ccflags-y += -I$(srctree)/drivers/usb/pd
+
 obj-$(CONFIG_QPNP_USB_PDPHY) += qpnp-pdphy.o
 obj-$(CONFIG_USB_PD_POLICY) += usbpd.o
 usbpd-y := policy_engine.o
