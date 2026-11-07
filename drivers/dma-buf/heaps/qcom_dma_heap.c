@@ -17,6 +17,7 @@
 #include "qcom_carveout_heap.h"
 #include "qcom_secure_system_heap.h"
 #include "qcom_dma_heap_priv.h"
+#include "deferred-free-helper.h"
 #include "qcom_system_movable_heap.h"
 
 /*
@@ -158,8 +159,16 @@ static struct platform_driver qcom_dma_heap_driver = {
 
 static int __init init_heap_driver(void)
 {
+	int ret;
+
+	/* Part of the 6.1 kernel (CONFIG_DMABUF_HEAPS_DEFERRED_FREE=y). */
+	ret = deferred_freelist_init();
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&qcom_dma_heap_driver);
 }
 module_init(init_heap_driver);
 
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS("DMA_BUF_HEAP");
