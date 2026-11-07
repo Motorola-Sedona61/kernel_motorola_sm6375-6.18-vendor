@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/err.h>
@@ -15,7 +15,7 @@
 #include <linux/thermal.h>
 #include <linux/suspend.h>
 #include "tsens2xxx.h"
-#include "../thermal_core.h"
+#include "thermal_core.h"
 #include "thermal_zone_internal.h"
 
 LIST_HEAD(tsens_device_list);
@@ -106,24 +106,6 @@ static int tsens_restore(struct device *dev)
 }
 
 static const struct of_device_id tsens_table[] = {
-	{	.compatible = "qcom,msm8953-tsens",
-		.data = &data_tsens2xxx,
-	},
-	{	.compatible = "qcom,msmhamster-tsens",
-		.data = &data_tsens2xxx,
-	},
-	{	.compatible = "qcom,sdm660-tsens",
-		.data = &data_tsens23xx,
-	},
-	{	.compatible = "qcom,sdm630-tsens",
-		.data = &data_tsens23xx,
-	},
-	{	.compatible = "qcom,sm6150-tsens",
-		.data = &data_tsens23xx,
-	},
-	{	.compatible = "qcom,sdm845-tsens",
-		.data = &data_tsens24xx,
-	},
 	{	.compatible = "qcom,tsens24xx",
 		.data = &data_tsens24xx,
 	},
