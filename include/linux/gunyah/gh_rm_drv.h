@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- *
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __GH_RM_DRV_H
@@ -11,10 +10,17 @@
 #include <linux/types.h>
 #include <linux/notifier.h>
 #include <linux/fwnode.h>
-#include <linux/gunyah_rsc_mgr.h>
+#include <linux/gunyah.h>
 #include <linux/range.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 
 #include "gh_common.h"
+
+/*
+ * IDs for QTVMs vs non-QTVMs
+ */
+#define QCOM_SCM_RM_MANAGED_VMID 0x3A
+#define QCOM_SCM_MAX_MANAGED_VMID 0x3F
 
 /* Notification type Message IDs */
 /* Memory APIs */
@@ -40,7 +46,10 @@
 #define GH_RM_MEM_ACCEPT_VALIDATE_ACL_ATTRS	BIT(1)
 #define GH_RM_MEM_ACCEPT_VALIDATE_LABEL		BIT(2)
 #define GH_RM_MEM_ACCEPT_MAP_IPA_CONTIGUOUS	BIT(4)
+#define GH_RM_MEM_ACCEPT_SANITIZE_ON_RELEASE	BIT(5)
 #define GH_RM_MEM_ACCEPT_DONE			BIT(7)
+/* linux driver flag - not passed to gunyah */
+#define GH_RM_MEM_ACCEPT_NO_SANITIZE_ON_RELEASE	BIT(31)
 
 #define GH_RM_MEM_SHARE_SANITIZE		BIT(0)
 #define GH_RM_MEM_SHARE_APPEND			BIT(1)
@@ -74,9 +83,12 @@
 
 #define MAX_EXIT_REASON_SIZE			4
 
-struct gh_rm_mem_shared_acl_entry;
-struct gh_rm_mem_shared_sgl_entry;
-struct gh_rm_mem_shared_attr_entry;
+/* Types of Hyp heap - Root and RM Heap */
+enum gh_hyp_heap_label {
+	GH_HYP_HEAP_ROOT = 0,
+	GH_HYP_HEAP_RM,
+	GH_HYP_HEAP_OBJ_MAX
+};
 
 struct gh_rm_notif_mem_shared_payload {
 	u32 mem_handle;
@@ -91,20 +103,11 @@ struct gh_rm_notif_mem_shared_payload {
 	/* TODO: How to arrange multiple variable length struct arrays? */
 } __packed;
 
-struct gh_rm_mem_shared_acl_entry {
-	u16 acl_vmid;
-	u8 acl_rights;
-	u8 reserved;
-} __packed;
-
-struct gh_rm_mem_shared_sgl_entry {
-	u32 sgl_size_low;
-	u32 sgl_size_high;
-} __packed;
-
-struct gh_rm_mem_shared_attr_entry {
-	u16 attributes;
-	u16 attributes_vmid;
+/* Compared with gh_sgl_desc, ipa_base field is not present */
+struct gh_rm_notif_mem_shared_sgl_desc {
+	u16 n_sgl_entries;
+	u16 reserved;
+	u64 size[];
 } __packed;
 
 struct gh_rm_notif_mem_released_payload {
@@ -143,10 +146,10 @@ struct gh_acl_desc {
 } __packed;
 
 struct gh_sgl_desc {
-	u16 n_sgl_entries;
+	u32 n_sgl_entries;
 	u16 reserved;
 	struct gh_sgl_entry sgl_entries[];
-} __packed;
+};
 
 struct gh_mem_attr_desc {
 	u16 n_mem_attr_entries;
@@ -193,6 +196,7 @@ struct gh_notify_vmid_desc {
 #define GH_RM_VM_STATUS_EXITED		9
 #define GH_RM_VM_STATUS_RESETTING	10
 #define GH_RM_VM_STATUS_RESET		11
+#define GH_RM_VM_STATUS_RESET_FAILED	12
 
 #define GH_RM_OS_STATUS_NONE		0
 #define GH_RM_OS_STATUS_EARLY_BOOT	1
@@ -278,6 +282,48 @@ struct gh_vm_auth_param_entry {
 	u32 auth_param_type;
 	u32 auth_param;
 } __packed;
+
+typedef union {
+	struct {
+		u8 type;
+		u8 reserved1;
+		__le16 reserved2;
+		__le32 size;
+		__le64 base_addr;
+	} __packed iomem;
+	struct {
+		u8 type;
+		u8 reserved1;
+		__le16 reserved2;
+		__le32 irq;
+		__le64 reserved3;
+	} __packed irq;
+	struct {
+		u8 type;
+		u8 reserved1;
+		__le16 reserved2;
+		__le32 iommu_hdl;
+		__le32 endpt_id_base;
+		__le32 endpt_id_count;
+	} __packed iommu;
+	struct {
+		u8 type;
+		u8 reserved1;
+		__le16 reserved2;
+		__le32 rtr_hdl;
+		__le32 endpt_id_base;
+		__le32 endpt_id_count;
+	} __packed msi;
+	struct {
+		u8 type;
+		u8 reserved1;
+		__le16 responder_id;
+		__le32 rc_hdl;
+		__le64 reserved2;
+	} __packed pcie;
+} __packed gh_dev_rsc_desc;
+_Static_assert(sizeof(gh_dev_rsc_desc) == 16,
+	       "gh_dev_rsc_desc: Invalid size, expected 16 bytes.");
 
 /* Arch specific APIs */
 #if IS_ENABLED(CONFIG_GH_ARM64_DRV)
@@ -412,7 +458,7 @@ int gh_rm_mem_qcom_lookup_sgl(u8 mem_type, gh_label_t label,
 int gh_rm_mem_release(gh_memparcel_handle_t handle, u8 flags);
 int ghd_rm_mem_reclaim(gh_memparcel_handle_t handle, u8 flags);
 struct gh_sgl_desc *gh_rm_mem_accept(gh_memparcel_handle_t handle, u8 mem_type,
-				     u8 trans_type, u8 flags, gh_label_t label,
+				     u8 trans_type, u32 flags, gh_label_t label,
 				     struct gh_acl_desc *acl_desc,
 				     struct gh_sgl_desc *sgl_desc,
 				     struct gh_mem_attr_desc *mem_attr_desc,
@@ -429,6 +475,12 @@ int gh_rm_mem_donate(u8 mem_type, u8 flags, gh_label_t label,
 		   struct gh_acl_desc *acl_desc, struct gh_sgl_desc *sgl_desc,
 		   struct gh_mem_attr_desc *mem_attr_desc,
 		   gh_memparcel_handle_t *handle);
+int gh_rm_heap_query(u32 heap_handle, u8 type,
+		void **response, size_t *resp_size);
+int gh_rm_add_heap_memory(u32 heap_handle,
+		gh_memparcel_handle_t memparcel_handle);
+int gh_rm_remove_heap_memory(u32 heap_handle,
+		gh_memparcel_handle_t memparcel_handle);
 int gh_rm_mem_notify(gh_memparcel_handle_t handle, u8 flags,
 		     gh_label_t mem_info_tag,
 		     struct gh_notify_vmid_desc *vmid_desc);
@@ -438,6 +490,9 @@ int gh_rm_ipa_reserve(u64 size, u64 align, struct range limits, u32 generic_cons
 /* API to set time base */
 int gh_rm_vm_set_time_base(gh_vmid_t vmid);
 
+/* API to set debug */
+int gh_rm_vm_set_debug(gh_vmid_t vmid);
+
 /* API for minidump support */
 int gh_rm_minidump_get_info(void);
 int gh_rm_minidump_register_range(phys_addr_t base_ipa, size_t region_size,
@@ -445,6 +500,15 @@ int gh_rm_minidump_register_range(phys_addr_t base_ipa, size_t region_size,
 int gh_rm_minidump_deregister_slot(uint16_t slot_num);
 int gh_rm_minidump_get_slot_from_name(uint16_t starting_slot, const char *name,
 				      size_t name_size);
+/* API for device management */
+int gh_rm_device_find_handle(gh_dev_rsc_desc *rsc_desc, gh_dev_handle_t *hdl);
+void *gh_rm_device_get_resources(gh_dev_handle_t dev_hdl, u8 flags, int *n_rsc);
+int gh_rm_device_accept(gh_dev_handle_t dev_hdl, u8 flags, gh_dev_handle_t bus_hdl);
+int gh_rm_device_lend(gh_dev_handle_t dev_hdl, gh_vmid_t vmid, u8 flags);
+int gh_rm_device_release(gh_dev_handle_t dev_hdl, u8 flags);
+int gh_rm_device_reclaim(gh_dev_handle_t dev_hdl, u8 flags);
+int gh_rm_device_bus_lockdown(gh_dev_handle_t dev_hdl);
+int gh_rm_device_bus_unlock(gh_dev_handle_t dev_hdl);
 
 #else
 /* RM client register notifications APIs */
@@ -586,6 +650,11 @@ static inline int gh_rm_populate_hyp_res(gh_vmid_t vmid, const char *vm_name)
 	return -EINVAL;
 }
 
+static inline int gh_rm_unpopulate_hyp_res(gh_vmid_t vmid, const char *vm_name)
+{
+	return -EINVAL;
+}
+
 /* Client APIs for VM Services */
 static inline struct gh_vm_status *gh_rm_vm_get_status(gh_vmid_t vmid)
 {
@@ -654,7 +723,7 @@ static inline int ghd_rm_mem_reclaim(gh_memparcel_handle_t handle, u8 flags)
 
 static inline struct gh_sgl_desc *gh_rm_mem_accept(gh_memparcel_handle_t handle,
 				     u8 mem_type,
-				     u8 trans_type, u8 flags, gh_label_t label,
+				     u8 trans_type, u32 flags, gh_label_t label,
 				     struct gh_acl_desc *acl_desc,
 				     struct gh_sgl_desc *sgl_desc,
 				     struct gh_mem_attr_desc *mem_attr_desc,
@@ -683,6 +752,24 @@ static inline int gh_rm_mem_donate(u8 mem_type, u8 flags, gh_label_t label,
 		   struct gh_acl_desc *acl_desc, struct gh_sgl_desc *sgl_desc,
 		   struct gh_mem_attr_desc *mem_attr_desc,
 		   gh_memparcel_handle_t *handle)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_heap_query(u32 heap_handle, u8 type,
+		void **response, size_t *resp_size)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_add_heap_memory(u32 heap_handle,
+		gh_memparcel_handle_t memparcel_handle)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_remove_heap_memory(u32 heap_handle,
+		gh_memparcel_handle_t memparcel_handle)
 {
 	return -EINVAL;
 }
@@ -740,6 +827,12 @@ static inline int gh_rm_vm_set_time_base(gh_vmid_t vmid)
 	return -EINVAL;
 }
 
+/* API to set debug */
+static inline int gh_rm_vm_set_debug(gh_vmid_t vmid)
+{
+	return -EINVAL;
+}
+
 /* API for minidump support */
 static inline int gh_rm_minidump_get_info(void)
 {
@@ -771,5 +864,47 @@ static inline int gh_rm_ipa_reserve(u64 size, u64 align, struct range limits,
 {
 	return -EINVAL;
 }
+
+static inline int gh_rm_device_find_handle(gh_dev_rsc_desc *rsc_desc, gh_dev_handle_t *hdl)
+{
+	return -EINVAL;
+}
+
+static inline void *gh_rm_device_get_resources(gh_dev_handle_t dev_hdl, u8 flags, int *n_rsc)
+{
+	return ERR_PTR(-EINVAL);
+}
+
+static inline int gh_rm_device_bus_lockdown(gh_dev_handle_t dev_hdl)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_device_bus_unlock(gh_dev_handle_t dev_hdl)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_device_accept(gh_dev_handle_t dev_hdl, u8 flags,
+		gh_dev_handle_t bus_hdl)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_device_lend(gh_dev_handle_t dev_hdl, gh_vmid_t vmid, u8 flags)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_device_release(gh_dev_handle_t dev_hdl, u8 flags)
+{
+	return -EINVAL;
+}
+
+static inline int gh_rm_device_reclaim(gh_dev_handle_t dev_hdl, u8 flags)
+{
+	return -EINVAL;
+}
+
 #endif
 #endif
