@@ -1871,6 +1871,7 @@ static const struct file_operations fops = {
 	.poll               = drm_poll,
 	.read               = drm_read,
 	.mmap               = msm_gem_mmap,
+	.fop_flags          = FOP_UNSIGNED_OFFSET,
 };
 
 static struct drm_driver msm_driver = {
