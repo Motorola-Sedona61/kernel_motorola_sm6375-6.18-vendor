@@ -18,6 +18,7 @@
 #include <linux/elf.h>
 #include <linux/slab.h>
 #include <linux/panic_notifier.h>
+#include <linux/vmalloc.h>
 #include <soc/qcom/minidump.h>
 #include "elf.h"
 
@@ -789,7 +790,7 @@ static int qcom_va_md_driver_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	for (i = 0; i < count; i++)
-		pages[i] = nth_page(page, i);
+		pages[i] = page + i;
 
 	vaddr = vmap(pages, count, VM_DMA_COHERENT, pgprot_dmacoherent(PAGE_KERNEL));
 	kfree(pages);

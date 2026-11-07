@@ -46,7 +46,9 @@
 
 #include <linux/sched/cputime.h>
 #include "../../../kernel/sched/sched.h"
+#if IS_ENABLED(CONFIG_SCHED_WALT)
 #include <linux/sched/walt.h>
+#endif
 
 #include <linux/kdebug.h>
 #include <linux/thread_info.h>

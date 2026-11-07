@@ -1156,7 +1156,7 @@ static struct kobj_type pmu_settings_ktype = {
 
 static int qcom_pmu_driver_probe(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
+	struct device *dev = &pdev->dev, *cpu_root;
 	int ret = 0, idx, len;
 	unsigned int cpu;
 	struct cpu_data *cpu_data;
@@ -1212,8 +1212,12 @@ skip_pmu:
 		return ret;
 	}
 
+	cpu_root = bus_get_dev_root(&cpu_subsys);
+	if (!cpu_root)
+		return -ENODEV;
 	ret = kobject_init_and_add(&pmu_kobj, &pmu_settings_ktype,
-				   &cpu_subsys.dev_root->kobj, "pmu_lib");
+				   &cpu_root->kobj, "pmu_lib");
+	put_device(cpu_root);
 	if (ret < 0) {
 		dev_err(dev, "failed to init pmu counters kobj: %d\n", ret);
 		kobject_put(&pmu_kobj);

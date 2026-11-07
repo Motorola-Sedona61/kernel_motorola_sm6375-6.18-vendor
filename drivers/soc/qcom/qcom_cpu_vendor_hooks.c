@@ -128,9 +128,9 @@ static void store_kaslr_offset(void)
 		return;
 
 	__raw_writel(0xdead4ead, mem);
-	__raw_writel((kimage_vaddr - KIMAGE_VADDR) & KASLR_OFFSET_MASK,
+	__raw_writel(kaslr_offset() & KASLR_OFFSET_MASK,
 		     mem + 4);
-	__raw_writel(((kimage_vaddr - KIMAGE_VADDR) >> 32) & KASLR_OFFSET_MASK,
+	__raw_writel((kaslr_offset() >> 32) & KASLR_OFFSET_MASK,
 		     mem + 8);
 
 	iounmap(mem);

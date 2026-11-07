@@ -19,6 +19,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <soc/qcom/dcvs.h>
 #include <soc/qcom/of_common.h>
@@ -648,7 +649,7 @@ static int populate_freq_table(struct device *dev, u32 **freq_table)
 
 static int qcom_dcvs_dev_probe(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
+	struct device *dev = &pdev->dev, *cpu_root;
 	int ret;
 
 	dcvs_data = devm_kzalloc(dev, sizeof(*dcvs_data), GFP_KERNEL);
@@ -661,8 +662,12 @@ static int qcom_dcvs_dev_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	cpu_root = bus_get_dev_root(&cpu_subsys);
+	if (!cpu_root)
+		return -ENODEV;
 	ret = kobject_init_and_add(&dcvs_data->kobj, &qcom_dcvs_ktype,
-			&cpu_subsys.dev_root->kobj, "bus_dcvs");
+			&cpu_root->kobj, "bus_dcvs");
+	put_device(cpu_root);
 	if (ret < 0) {
 		dev_err(dev, "failed to init qcom-dcvs kobj: %d\n", ret);
 		kobject_put(&dcvs_data->kobj);

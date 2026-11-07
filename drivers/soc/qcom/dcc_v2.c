@@ -1821,7 +1821,6 @@ static const struct file_operations dcc_sram_fops = {
 	.owner		= THIS_MODULE,
 	.open		= dcc_sram_open,
 	.read		= dcc_sram_read,
-	.llseek		= no_llseek,
 };
 
 static int dcc_sram_dev_register(struct dcc_drvdata *drvdata)
