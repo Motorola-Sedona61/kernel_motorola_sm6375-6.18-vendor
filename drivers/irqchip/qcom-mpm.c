@@ -639,9 +639,10 @@ static const struct of_device_id mpm_gic_chip_data_table[] = {
 };
 MODULE_DEVICE_TABLE(of, mpm_gic_chip_data_table);
 
-static int msm_mpm_irqchip_init(struct device_node *node,
-						struct device_node *parent)
+static int msm_mpm_irqchip_init(struct platform_device *pdev,
+				struct device_node *parent)
 {
+	struct device_node *node = pdev->dev.of_node;
 	struct irq_domain *parent_domain;
 	const struct of_device_id *id;
 	int ret;
