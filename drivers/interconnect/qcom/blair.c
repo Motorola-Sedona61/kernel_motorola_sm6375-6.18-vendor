@@ -1671,6 +1671,8 @@ static int qnoc_probe(struct platform_device *pdev)
 			    GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
+	/* nodes[] is __counted_by(num_nodes) since 6.x: set it before the writes. */
+	data->num_nodes = num_nodes;
 
 	qp->bus_clks = devm_kmemdup(dev, bus_clocks, sizeof(bus_clocks),
 				    GFP_KERNEL);
@@ -1754,7 +1756,6 @@ static int qnoc_probe(struct platform_device *pdev)
 
 		data->nodes[i] = node;
 	}
-	data->num_nodes = num_nodes;
 
 	ret = icc_provider_register(provider);
 	if (ret)
