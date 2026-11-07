@@ -4,6 +4,8 @@
 # This directory first, then the kernel subsystem's private headers,
 # as for an in-tree build.
 ccflags-y += -I$(src) -I$(srctree)/drivers/iommu
+# The Qualcomm 6.12 sources include "drivers/iommu/..." from the kernel root.
+ccflags-y += -I$(srctree)
 
 obj-$(CONFIG_QTI_IOMMU_SUPPORT) += iommu-logger.o
 obj-$(CONFIG_QCOM_LAZY_MAPPING) += msm_dma_iommu_mapping.o

@@ -4,6 +4,8 @@
 # This directory first, then the kernel subsystem's private headers,
 # as for an in-tree build.
 ccflags-y += -I$(src) -I$(srctree)/drivers/iommu/arm/arm-smmu
+# The Qualcomm 6.12 sources include "drivers/iommu/..." from the kernel root.
+ccflags-y += -I$(srctree)
 
 obj-$(CONFIG_ARM_SMMU) += arm_smmu.o
-arm_smmu-y := arm-smmu.o arm-smmu-impl.o arm-smmu-nvidia.o arm-smmu-qcom.o arm-smmu-qcom-pm.o
+arm_smmu-y := arm-smmu.o arm-smmu-impl.o arm-smmu-qcom.o arm-smmu-qcom-pm.o
