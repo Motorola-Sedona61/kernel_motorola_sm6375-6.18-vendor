@@ -7,6 +7,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/of_platform.h>
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
