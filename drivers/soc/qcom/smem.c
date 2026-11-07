@@ -1204,7 +1204,7 @@ release:
 	return ret;
 }
 
-static int qcom_smem_remove(struct platform_device *pdev)
+static void qcom_smem_remove(struct platform_device *pdev)
 {
 	platform_device_unregister(__smem->socinfo);
 
@@ -1217,8 +1217,6 @@ static int qcom_smem_remove(struct platform_device *pdev)
 	 */
 	kfree(__smem);
 	__smem = NULL;
-
-	return 0;
 }
 
 static int qcom_smem_freeze(struct device *dev)

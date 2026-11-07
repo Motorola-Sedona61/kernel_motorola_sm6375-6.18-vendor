@@ -59,7 +59,7 @@ static int msm_restart_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int msm_restart_remove(struct platform_device *pdev)
+static void msm_restart_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int ret;
@@ -67,8 +67,6 @@ static int msm_restart_remove(struct platform_device *pdev)
 	ret = unregister_restart_handler(&restart_nb);
 	if (ret)
 		dev_err(dev, "failed to unregister restart handler.\n");
-
-	return 0;
 }
 
 static const struct of_device_id of_msm_restart_match[] = {

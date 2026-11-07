@@ -3717,19 +3717,17 @@ static void arm_smmu_device_shutdown(struct platform_device *pdev)
 		arm_smmu_power_off(smmu, smmu->pwr);
 }
 
-static int arm_smmu_device_remove(struct platform_device *pdev)
+static void arm_smmu_device_remove(struct platform_device *pdev)
 {
 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
 
 	if (!smmu)
-		return -ENODEV;
+		return;
 
 	iommu_device_unregister(&smmu->iommu);
 	iommu_device_sysfs_remove(&smmu->iommu);
 
 	arm_smmu_device_shutdown(pdev);
-
-	return 0;
 }
 
 static int __maybe_unused arm_smmu_runtime_resume(struct device *dev)

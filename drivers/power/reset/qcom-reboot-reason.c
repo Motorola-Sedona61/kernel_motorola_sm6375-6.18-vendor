@@ -266,7 +266,7 @@ static int qcom_reboot_reason_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int qcom_reboot_reason_remove(struct platform_device *pdev)
+static void qcom_reboot_reason_remove(struct platform_device *pdev)
 {
 	struct qcom_reboot_reason *reboot = platform_get_drvdata(pdev);
 
@@ -278,8 +278,6 @@ static int qcom_reboot_reason_remove(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_MOTO_LEGACY_REBOOT_REASON_SUPPORT)
 	unregister_restart_handler(&reboot->restart_nb);
 #endif
-
-	return 0;
 }
 
 static const struct of_device_id of_qcom_reboot_reason_match[] = {

@@ -1228,12 +1228,11 @@ err_range:
 	return ret;
 }
 
-static int pmic_gpio_remove(struct platform_device *pdev)
+static void pmic_gpio_remove(struct platform_device *pdev)
 {
 	struct pmic_gpio_state *state = platform_get_drvdata(pdev);
 
 	gpiochip_remove(&state->chip);
-	return 0;
 }
 
 static const struct of_device_id pmic_gpio_of_match[] = {

@@ -377,11 +377,9 @@ static int glink_rpm_unregister(struct device *dev)
 	return 0;
 }
 
-static int glink_rpm_remove(struct platform_device *pdev)
+static void glink_rpm_remove(struct platform_device *pdev)
 {
 	glink_rpm_unregister(&pdev->dev);
-
-	return 0;
 }
 
 static const struct of_device_id glink_rpm_of_match[] = {

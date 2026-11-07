@@ -2536,7 +2536,7 @@ spi_geni_probe_err:
 	return ret;
 }
 
-static int spi_geni_remove(struct platform_device *pdev)
+static void spi_geni_remove(struct platform_device *pdev)
 {
 	int ret;
 	struct spi_master *master = platform_get_drvdata(pdev);
@@ -2559,7 +2559,6 @@ static int spi_geni_remove(struct platform_device *pdev)
 	if (geni_mas->ipc_log_kpi)
 		ipc_log_context_destroy(geni_mas->ipc_log_kpi);
 
-	return ret;
 }
 
 #if IS_ENABLED(CONFIG_PM)

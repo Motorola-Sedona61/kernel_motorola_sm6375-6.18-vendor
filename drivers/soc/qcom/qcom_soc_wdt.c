@@ -145,11 +145,11 @@ static int qcom_soc_wdt_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int qcom_soc_wdt_remove(struct platform_device *pdev)
+static void qcom_soc_wdt_remove(struct platform_device *pdev)
 {
 	if (fogos_diag)
 		device_remove_file(&pdev->dev, &dev_attr_fogos_registers);
-	return qcom_wdt_remove(pdev);
+	qcom_wdt_remove(pdev);
 }
 
 static const struct dev_pm_ops qcom_soc_dev_pm_ops = {

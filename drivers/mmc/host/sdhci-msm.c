@@ -5674,7 +5674,7 @@ pltfm_free:
 	return ret;
 }
 
-static int sdhci_msm_remove(struct platform_device *pdev)
+static void sdhci_msm_remove(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
 	struct sdhci_pltfm_host *pltfm_host;
@@ -5688,7 +5688,7 @@ static int sdhci_msm_remove(struct platform_device *pdev)
 	if (of_property_read_bool(np, "non-removable") &&
 			!is_bootdevice_sdhci) {
 		dev_err(&pdev->dev, "SDHCI is not boot dev.\n");
-		return 0;
+		return;
 	}
 
 	host = platform_get_drvdata(pdev);
@@ -5734,7 +5734,6 @@ skip_removing_qos:
 		sdhci_msm_bus_unregister(&pdev->dev, msm_host);
 	}
 	sdhci_pltfm_free(pdev);
-	return 0;
 }
 
 static __maybe_unused int sdhci_msm_runtime_suspend(struct device *dev)

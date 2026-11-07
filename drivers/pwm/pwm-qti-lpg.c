@@ -2075,7 +2075,7 @@ err_out:
 	return rc;
 }
 
-static int qpnp_lpg_remove(struct platform_device *pdev)
+static void qpnp_lpg_remove(struct platform_device *pdev)
 {
 	struct qpnp_lpg_chip *chip = dev_get_drvdata(&pdev->dev);
 
@@ -2083,8 +2083,6 @@ static int qpnp_lpg_remove(struct platform_device *pdev)
 	pwmchip_remove(&chip->pwm_chip);
 	mutex_destroy(&chip->bus_lock);
 	dev_set_drvdata(chip->dev, NULL);
-
-	return 0;
 }
 
 static const struct of_device_id qpnp_lpg_of_match[] = {

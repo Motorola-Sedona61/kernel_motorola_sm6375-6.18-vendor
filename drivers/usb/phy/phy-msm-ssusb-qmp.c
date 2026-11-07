@@ -1248,12 +1248,12 @@ err:
 	return ret;
 }
 
-static int msm_ssphy_qmp_remove(struct platform_device *pdev)
+static void msm_ssphy_qmp_remove(struct platform_device *pdev)
 {
 	struct msm_ssphy_qmp *phy = platform_get_drvdata(pdev);
 
 	if (!phy)
-		return 0;
+		return;
 
 	if (phy->qmp_phy_tune_seq) {
 		kfree(phy->qmp_phy_tune_seq);
@@ -1264,7 +1264,6 @@ static int msm_ssphy_qmp_remove(struct platform_device *pdev)
 	usb_remove_phy(&phy->phy);
 	msm_ssphy_qmp_enable_clks(phy, false);
 	msm_ssusb_qmp_ldo_enable(phy, 0);
-	return 0;
 }
 
 static struct platform_driver msm_ssphy_qmp_driver = {

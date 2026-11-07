@@ -1466,7 +1466,7 @@ static const struct regulator_ops *vreg_ops[] = {
 	[RPM_REGULATOR_TYPE_BOB]	= &bob_ops,
 };
 
-static int rpm_vreg_device_remove(struct platform_device *pdev)
+static void rpm_vreg_device_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rpm_regulator *reg;
@@ -1483,15 +1483,13 @@ static int rpm_vreg_device_remove(struct platform_device *pdev)
 		rpm_vreg_unlock(rpm_vreg);
 	} else {
 		dev_err(dev, "%s: drvdata missing\n", __func__);
-		return -EINVAL;
+		return;
 	}
 
 	platform_set_drvdata(pdev, NULL);
-
-	return 0;
 }
 
-static int rpm_vreg_resource_remove(struct platform_device *pdev)
+static void rpm_vreg_resource_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rpm_regulator *reg, *reg_temp;
@@ -1520,12 +1518,10 @@ static int rpm_vreg_resource_remove(struct platform_device *pdev)
 		kfree(rpm_vreg);
 	} else {
 		dev_err(dev, "%s: drvdata missing\n", __func__);
-		return -EINVAL;
+		return;
 	}
 
 	platform_set_drvdata(pdev, NULL);
-
-	return 0;
 }
 
 static int rpm_vreg_set_smps_ldo_voltage_index(struct device *dev,
