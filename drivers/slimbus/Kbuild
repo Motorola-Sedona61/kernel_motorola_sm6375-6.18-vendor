@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/drivers/slimbus
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/slimbus
 
 obj-$(CONFIG_SLIMBUS) += slimbus.o
 slimbus-y := core.o messaging.o sched.o stream.o

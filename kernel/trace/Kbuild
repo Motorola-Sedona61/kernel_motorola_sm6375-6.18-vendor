@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/kernel/trace
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/kernel/trace
 
 ccflags-remove-$(CONFIG_FUNCTION_TRACER) += $(CC_FLAGS_FTRACE)
 ccflags-y += -DDISABLE_BRANCH_PROFILING

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/drivers/mfd
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/mfd
 
 obj-$(CONFIG_MFD_I2C_PMIC) += qcom-i2c-pmic.o
 obj-$(CONFIG_MFD_SPMI_PMIC) += qcom-spmi-pmic.o

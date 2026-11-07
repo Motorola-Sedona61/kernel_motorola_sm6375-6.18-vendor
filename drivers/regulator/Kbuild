@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/drivers/regulator
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/regulator
 
 obj-$(CONFIG_REGULATOR_DEBUG_CONTROL) += debug-regulator.o
 obj-$(CONFIG_REGULATOR_PROXY_CONSUMER) += proxy-consumer.o

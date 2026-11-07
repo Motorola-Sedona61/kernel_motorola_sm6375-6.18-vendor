@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/drivers/power/reset
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/power/reset
 
 obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
 obj-$(CONFIG_POWER_RESET_QCOM_DOWNLOAD_MODE) += qcom-dload-mode.o

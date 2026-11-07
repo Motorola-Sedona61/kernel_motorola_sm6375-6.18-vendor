@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Objects as linked by the fogos 6.1 build.
 
-# Private headers of the kernel subsystem, as for an in-tree build.
-ccflags-y += -I$(srctree)/drivers/thermal/qcom
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/thermal/qcom
 
 obj-$(CONFIG_THERMAL_TSENS_LEGACY) += msm-tsens-driver.o
 msm-tsens-driver-y := msm-tsens.o tsens2xxx.o tsens-dbg.o
