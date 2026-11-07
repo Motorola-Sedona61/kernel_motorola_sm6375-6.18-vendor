@@ -4,6 +4,9 @@
 # This directory first, then the kernel subsystem's private headers,
 # as for an in-tree build.
 ccflags-y += -I$(src) -I$(srctree)/drivers/thermal/qcom
+# The Qualcomm 6.12 sources include thermal core headers from the kernel
+# root and from drivers/thermal.
+ccflags-y += -I$(srctree) -I$(srctree)/drivers/thermal
 
 obj-$(CONFIG_THERMAL_TSENS_LEGACY) += msm-tsens-driver.o
 msm-tsens-driver-y := msm-tsens.o tsens2xxx.o tsens-dbg.o
