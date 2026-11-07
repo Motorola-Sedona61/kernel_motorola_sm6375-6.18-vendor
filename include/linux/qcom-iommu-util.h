@@ -109,6 +109,8 @@ int qcom_iommu_get_fast_iova_range(struct device *dev,
 
 /* Remove once this function is exported by upstream kernel */
 void qcom_iommu_get_resv_regions(struct device *dev, struct list_head *list);
+void qcom_iommu_generate_resv_regions(struct device *dev,
+				      struct list_head *head);
 
 phys_addr_t qcom_iommu_iova_to_phys_hard(struct iommu_domain *domain,
 				    struct qcom_iommu_atos_txn *txn);
