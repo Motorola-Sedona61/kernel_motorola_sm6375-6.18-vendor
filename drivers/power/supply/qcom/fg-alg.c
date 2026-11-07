@@ -946,7 +946,7 @@ static void ttf_circ_buf_clr(struct ttf_circ_buf *buf)
 	memset(buf->arr, 0, sizeof(buf->arr));
 }
 
-static int cmp_int(const void *a, const void *b)
+static int fg_cmp_int(const void *a, const void *b)
 {
 	return *(int *)a - *(int *)b;
 }
@@ -968,7 +968,7 @@ static int ttf_circ_buf_median(struct ttf_circ_buf *buf, int *median)
 		return -ENOMEM;
 
 	memcpy(temp, buf->arr, buf->size * sizeof(*temp));
-	sort(temp, buf->size, sizeof(*temp), cmp_int, NULL);
+	sort(temp, buf->size, sizeof(*temp), fg_cmp_int, NULL);
 
 	if (buf->size % 2)
 		*median = temp[buf->size / 2];

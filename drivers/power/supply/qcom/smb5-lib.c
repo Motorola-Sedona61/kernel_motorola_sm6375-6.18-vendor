@@ -6368,7 +6368,7 @@ irqreturn_t smb5_usb_source_change_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-enum alarmtimer_restart smblib_lpd_recheck_timer(struct alarm *alarm,
+void smblib_lpd_recheck_timer(struct alarm *alarm,
 						ktime_t time)
 {
 	int val;
@@ -6382,7 +6382,7 @@ enum alarmtimer_restart smblib_lpd_recheck_timer(struct alarm *alarm,
 		if (rc < 0) {
 			smblib_err(chg, "Couldn't write 0x%02x to TYPE_C_INTRPT_ENB_SOFTWARE_CTRL rc=%d\n",
 				val, rc);
-			return ALARMTIMER_NORESTART;
+			return;
 		}
 		chg->moisture_present = false;
 		power_supply_changed(chg->usb_psy);
@@ -6393,14 +6393,13 @@ enum alarmtimer_restart smblib_lpd_recheck_timer(struct alarm *alarm,
 		if (rc < 0) {
 			smblib_err(chg, "Couldn't set TYPE_C_INTERRUPT_EN_CFG_2_REG rc=%d\n",
 					rc);
-			return ALARMTIMER_NORESTART;
+			return;
 		}
 	}
 
 	chg->lpd_stage = LPD_STAGE_NONE;
 	chg->lpd_reason = LPD_NONE;
 
-	return ALARMTIMER_NORESTART;
 }
 
 #define RSBU_K_300K_UV	3000000
@@ -7181,7 +7180,7 @@ static void dcin_aicl_work(struct work_struct *work)
 	dcin_aicl(chg);
 }
 
-static enum alarmtimer_restart dcin_aicl_alarm_cb(struct alarm *alarm,
+static void dcin_aicl_alarm_cb(struct alarm *alarm,
 							ktime_t now)
 {
 	struct smb_charger *chg = container_of(alarm, struct smb_charger,
@@ -7192,7 +7191,6 @@ static enum alarmtimer_restart dcin_aicl_alarm_cb(struct alarm *alarm,
 	pm_stay_awake(chg->dev);
 	schedule_work(&chg->dcin_aicl_work);
 
-	return ALARMTIMER_NORESTART;
 }
 
 static void dcin_icl_decrement(struct smb_charger *chg)
@@ -7968,7 +7966,7 @@ out:
 	vote(chg->awake_votable, MOISTURE_VOTER, false, 0);
 }
 
-static enum alarmtimer_restart moisture_protection_alarm_cb(struct alarm *alarm,
+static void moisture_protection_alarm_cb(struct alarm *alarm,
 							ktime_t now)
 {
 	struct smb_charger *chg = container_of(alarm, struct smb_charger,
@@ -7981,7 +7979,6 @@ static enum alarmtimer_restart moisture_protection_alarm_cb(struct alarm *alarm,
 	pm_stay_awake(chg->dev);
 	schedule_work(&chg->moisture_protection_work);
 
-	return ALARMTIMER_NORESTART;
 }
 
 static void smblib_chg_termination_work(struct work_struct *work)
@@ -8134,7 +8131,7 @@ out:
 	vote(chg->awake_votable, CHG_TERMINATION_VOTER, false, 0);
 }
 
-static enum alarmtimer_restart chg_termination_alarm_cb(struct alarm *alarm,
+static void chg_termination_alarm_cb(struct alarm *alarm,
 								ktime_t now)
 {
 	struct smb_charger *chg = container_of(alarm, struct smb_charger,
@@ -8147,7 +8144,6 @@ static enum alarmtimer_restart chg_termination_alarm_cb(struct alarm *alarm,
 	pm_stay_awake(chg->dev);
 	schedule_work(&chg->chg_termination_work);
 
-	return ALARMTIMER_NORESTART;
 }
 
 static void apsd_timer_cb(struct timer_list *tm)

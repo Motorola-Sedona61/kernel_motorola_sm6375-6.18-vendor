@@ -627,7 +627,7 @@ done:
 	mutex_unlock(&chip->soc_lock);
 }
 
-static enum alarmtimer_restart
+static void
 	qpnp_msoc_timer(struct alarm *alarm, ktime_t now)
 {
 	struct qpnp_qg *chip = container_of(alarm,
@@ -637,7 +637,6 @@ static enum alarmtimer_restart
 	pm_stay_awake(chip->dev);
 	schedule_work(&chip->scale_soc_work);
 
-	return ALARMTIMER_NORESTART;
 }
 
 int qg_scale_soc(struct qpnp_qg *chip, bool force_soc)

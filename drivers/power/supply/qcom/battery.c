@@ -561,7 +561,7 @@ static void split_settled(struct pl_data *chip)
 	chip->pl_settled_ua = slave_ua;
 }
 
-static ssize_t version_show(struct class *c, struct class_attribute *attr,
+static ssize_t version_show(const struct class *c, const struct class_attribute *attr,
 			char *buf)
 {
 	return scnprintf(buf, PAGE_SIZE, "%d.%d\n",
@@ -572,7 +572,7 @@ static CLASS_ATTR_RO(version);
 /*************
  * SLAVE PCT *
  **************/
-static ssize_t slave_pct_show(struct class *c, struct class_attribute *attr,
+static ssize_t slave_pct_show(const struct class *c, const struct class_attribute *attr,
 			char *ubuf)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
@@ -581,7 +581,7 @@ static ssize_t slave_pct_show(struct class *c, struct class_attribute *attr,
 	return scnprintf(ubuf, PAGE_SIZE, "%d\n", chip->slave_pct);
 }
 
-static ssize_t slave_pct_store(struct class *c, struct class_attribute *attr,
+static ssize_t slave_pct_store(const struct class *c, const struct class_attribute *attr,
 			const char *ubuf, size_t count)
 {
 	struct pl_data *chip = container_of(c, struct pl_data, qcom_batt_class);
@@ -612,7 +612,7 @@ static struct class_attribute class_attr_slave_pct =
 /************************
  * RESTRICTED CHARGIGNG *
  ************************/
-static ssize_t restrict_chg_show(struct class *c, struct class_attribute *attr,
+static ssize_t restrict_chg_show(const struct class *c, const struct class_attribute *attr,
 		char *ubuf)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
@@ -622,7 +622,7 @@ static ssize_t restrict_chg_show(struct class *c, struct class_attribute *attr,
 			chip->restricted_charging_enabled);
 }
 
-static ssize_t restrict_chg_store(struct class *c, struct class_attribute *attr,
+static ssize_t restrict_chg_store(const struct class *c, const struct class_attribute *attr,
 			const char *ubuf, size_t count)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
@@ -650,7 +650,7 @@ no_change:
 }
 static CLASS_ATTR_RW(restrict_chg);
 
-static ssize_t restrict_cur_show(struct class *c, struct class_attribute *attr,
+static ssize_t restrict_cur_show(const struct class *c, const struct class_attribute *attr,
 			char *ubuf)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
@@ -659,7 +659,7 @@ static ssize_t restrict_cur_show(struct class *c, struct class_attribute *attr,
 	return scnprintf(ubuf, PAGE_SIZE, "%d\n", chip->restricted_current);
 }
 
-static ssize_t restrict_cur_store(struct class *c, struct class_attribute *attr,
+static ssize_t restrict_cur_store(const struct class *c, const struct class_attribute *attr,
 			const char *ubuf, size_t count)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
@@ -682,8 +682,8 @@ static CLASS_ATTR_RW(restrict_cur);
 /****************************
  * FCC STEPPING IN PROGRESS *
  ****************************/
-static ssize_t fcc_stepping_in_progress_show(struct class *c,
-				struct class_attribute *attr, char *ubuf)
+static ssize_t fcc_stepping_in_progress_show(const struct class *c,
+				const struct class_attribute *attr, char *ubuf)
 {
 	struct pl_data *chip = container_of(c, struct pl_data,
 			qcom_batt_class);
@@ -2194,7 +2194,6 @@ int qcom_batt_init(struct device *dev, struct charger_param *chg_param)
 	chip->pl_disable = true;
 	chip->cp_disabled = true;
 	chip->qcom_batt_class.name = "qcom-battery",
-	chip->qcom_batt_class.owner = THIS_MODULE,
 	chip->qcom_batt_class.class_groups = batt_class_groups;
 
 	rc = class_register(&chip->qcom_batt_class);

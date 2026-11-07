@@ -1038,7 +1038,7 @@ static int smb5_init_usb_psy(struct smb5 *chip)
 	struct smb_charger *chg = &chip->chg;
 
 	usb_cfg.drv_data = chip;
-	usb_cfg.of_node = chg->dev->of_node;
+	usb_cfg.fwnode = of_fwnode_handle(chg->dev->of_node);
 	chg->usb_psy = devm_power_supply_register(chg->dev,
 						  &usb_psy_desc,
 						  &usb_cfg);
@@ -1138,7 +1138,7 @@ static int smb5_init_usb_port_psy(struct smb5 *chip)
 	struct smb_charger *chg = &chip->chg;
 
 	usb_port_cfg.drv_data = chip;
-	usb_port_cfg.of_node = chg->dev->of_node;
+	usb_port_cfg.fwnode = of_fwnode_handle(chg->dev->of_node);
 	chg->usb_port_psy = devm_power_supply_register(chg->dev,
 						  &usb_port_psy_desc,
 						  &usb_port_cfg);
@@ -1255,7 +1255,7 @@ static int smb5_init_dc_psy(struct smb5 *chip)
 	struct smb_charger *chg = &chip->chg;
 
 	dc_cfg.drv_data = chip;
-	dc_cfg.of_node = chg->dev->of_node;
+	dc_cfg.fwnode = of_fwnode_handle(chg->dev->of_node);
 	chg->dc_psy = devm_power_supply_register(chg->dev,
 						  &dc_psy_desc,
 						  &dc_cfg);
@@ -1464,7 +1464,7 @@ static int smb5_init_batt_psy(struct smb5 *chip)
 	int rc = 0;
 
 	batt_cfg.drv_data = chg;
-	batt_cfg.of_node = chg->dev->of_node;
+	batt_cfg.fwnode = of_fwnode_handle(chg->dev->of_node);
 	chg->batt_psy = devm_power_supply_register(chg->dev,
 					   &batt_psy_desc,
 					   &batt_cfg);
