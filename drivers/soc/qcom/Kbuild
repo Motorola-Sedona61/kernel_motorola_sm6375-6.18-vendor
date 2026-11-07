@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+CFLAGS_rpmh-rsc.o := -I$(src)
+
+obj-$(CONFIG_QCOM_COMMAND_DB) += cmd-db.o
+obj-$(CONFIG_QTI_CRYPTO_COMMON) += crypto-qti.o
+crypto-qti-y := crypto-qti-common.o crypto-qti-hwkm.o
+obj-$(CONFIG_QCOM_DCC_V2) += dcc_v2.o
+obj-$(CONFIG_QCOM_DEBUG_SYMBOL) += debug_symbol.o
+obj-$(CONFIG_QCOM_EUD) += eud.o
+obj-$(CONFIG_GIC_INTERRUPT_ROUTING) += gic_intr_routing.o
+obj-$(CONFIG_QCOM_GLINK) += glink_probe.o
+obj-$(CONFIG_QTI_HW_KEY_MANAGER_V1) += hwkm_v1.o
+obj-$(CONFIG_QCOM_MEMORY_DUMP_V2) += memory_dump_v2.o
+obj-$(CONFIG_QCOM_MINIDUMP) += minidump.o
+minidump-y := msm_minidump.o minidump_log.o minidump_smem.o minidump_memory.o
+obj-$(CONFIG_QCOM_PANEL_EVENT_NOTIFIER) += panel_event_notifier.o
+obj-$(CONFIG_QCOM_CPU_VENDOR_HOOKS) += qcom_cpu_vendor_hooks.o
+obj-$(CONFIG_QCOM_RPMH) += qcom_rpmh.o
+qcom_rpmh-y := rpmh-rsc.o rpmh.o
+obj-$(CONFIG_QCOM_SOC_WATCHDOG) += qcom_soc_wdt.o
+obj-$(CONFIG_QCOM_VA_MINIDUMP) += qcom_va_minidump.o
+obj-$(CONFIG_QCOM_WDT_CORE) += qcom_wdt_core.o
+obj-$(CONFIG_QCOM_SECURE_BUFFER) += secure_buffer.o
+obj-$(CONFIG_QCOM_SMEM) += smem.o
+obj-$(CONFIG_QCOM_SMP2P) += smp2p.o
+obj-$(CONFIG_QCOM_SMP2P_SLEEPSTATE) += smp2p_sleepstate.o
+obj-$(CONFIG_QCOM_SOCINFO) += socinfo.o

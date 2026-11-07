@@ -1,0 +1,7 @@
+# Build output lives in ../out/vendor (MO=).
+*.o
+*.ko
+*.mod*
+.*.cmd
+modules.order
+Module.symvers

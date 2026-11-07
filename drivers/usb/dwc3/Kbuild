@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+CFLAGS_trace.o := -I$(src)
+CFLAGS_dwc3-msm-core.o := -I$(srctree)/drivers/usb/host
+
+obj-$(CONFIG_USB_DWC3_MSM) += dwc3-msm.o
+dwc3-msm-y := dwc3-msm-core.o debug_ipc.o dwc3-msm-ops.o

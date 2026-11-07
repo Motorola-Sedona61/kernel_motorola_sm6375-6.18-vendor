@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_INTERCONNECT_QCOM_DEBUG) += icc-debug.o
+obj-$(CONFIG_INTERCONNECT_QCOM_RPM) += icc-rpm.o
+obj-$(CONFIG_INTERCONNECT_QCOM_BLAIR) += qnoc-blair.o
+qnoc-blair-y := blair.o
+obj-$(CONFIG_INTERCONNECT_QCOM_HOLI) += qnoc-holi.o
+qnoc-holi-y := holi.o
+obj-$(CONFIG_INTERCONNECT_QCOM_QOS_RPM) += qnoc-qos-rpm.o

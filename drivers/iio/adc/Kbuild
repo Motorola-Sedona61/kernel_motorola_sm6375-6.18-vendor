@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_QCOM_SPMI_ADC5) += qcom-spmi-adc5.o
+obj-$(CONFIG_QCOM_VADC_COMMON) += qcom-vadc-common.o

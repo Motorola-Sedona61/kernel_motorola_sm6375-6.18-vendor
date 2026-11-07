@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_QCOM_SHOW_RESUME_IRQ) += msm_show_resume_irq.o
+obj-$(CONFIG_MPM_LEGACY) += qcom-mpm.o

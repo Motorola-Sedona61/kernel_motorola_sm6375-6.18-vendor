@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_QCOM_SCM) += qcom-scm.o
+qcom-scm-y := qcom_scm.o qcom_scm-smc.o qcom_scm-legacy.o qtee_shmbridge.o

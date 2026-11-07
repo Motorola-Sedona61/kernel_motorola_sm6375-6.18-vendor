@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_PINCTRL_BLAIR) += pinctrl-blair.o
+obj-$(CONFIG_PINCTRL_HOLI) += pinctrl-holi.o
+obj-$(CONFIG_PINCTRL_MSM) += pinctrl-msm.o
+obj-$(CONFIG_PINCTRL_QCOM_SPMI_PMIC) += pinctrl-spmi-gpio.o

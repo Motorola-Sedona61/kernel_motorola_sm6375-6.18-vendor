@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_COMMON_CLK_QCOM) += clk-dummy.o
+obj-$(CONFIG_COMMON_CLK_QCOM) += clk-qcom.o
+clk-qcom-y := common.o vdd-class.o clk-regmap.o clk-alpha-pll.o clk-opp.o clk-pll.o clk-rcg.o clk-rcg2.o clk-branch.o clk-regmap-divider.o clk-regmap-mux.o clk-regmap-mux-div.o clk-regmap-phy-mux.o clk-hfpll.o reset.o clk-pm.o clk-debug.o gdsc.o
+obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
+obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
+obj-$(CONFIG_SM_DISPCC_BLAIR) += dispcc-blair.o
+obj-$(CONFIG_SM_DISPCC_HOLI) += dispcc-holi.o
+obj-$(CONFIG_SM_DEBUGCC_BLAIR) += gcc-blair.o
+obj-$(CONFIG_SM_DEBUGCC_HOLI) += gcc-holi.o
+obj-$(CONFIG_QCOM_GDSC_REGULATOR) += gdsc-regulator.o

@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_SLIMBUS) += slimbus.o
+slimbus-y := core.o messaging.o sched.o stream.o

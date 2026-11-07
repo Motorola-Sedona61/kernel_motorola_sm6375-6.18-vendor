@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_SCSI_UFS_QCOM) += ufs_qcom.o
+ufs_qcom-y := ufs-qcom.o ufs-qcom-ice.o
+obj-$(CONFIG_SCSI_UFS_CRYPTO_QTI) += ufshcd-crypto-qti.o

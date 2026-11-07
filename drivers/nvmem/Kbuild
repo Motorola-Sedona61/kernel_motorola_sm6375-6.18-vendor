@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_NVMEM_QCOM_QFPROM) += nvmem_qfprom.o
+nvmem_qfprom-y := qfprom.o

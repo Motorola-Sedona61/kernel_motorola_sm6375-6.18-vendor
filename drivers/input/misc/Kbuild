@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_INPUT_PM8941_PWRKEY) += pm8941-pwrkey.o
+obj-$(CONFIG_INPUT_QPNP_POWER_ON) += qpnp-power-on.o

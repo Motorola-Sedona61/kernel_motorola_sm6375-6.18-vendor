@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+ccflags-remove-$(CONFIG_FUNCTION_TRACER) += $(CC_FLAGS_FTRACE)
+ccflags-y += -DDISABLE_BRANCH_PROFILING
+
+obj-$(CONFIG_IPC_LOGGING) += qcom_ipc_logging.o
+qcom_ipc_logging-y := ipc_logging.o ipc_logging_debug.o

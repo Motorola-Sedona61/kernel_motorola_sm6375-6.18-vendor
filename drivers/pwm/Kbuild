@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+obj-$(CONFIG_PWM_QTI_LPG) += pwm-qti-lpg.o
