@@ -32,22 +32,8 @@
  */
 #define DMA_ATTR_QTI_SMMU_PROXY_MAP	(1UL << 18)
 
-#ifndef DMA_ATTR_SYS_CACHE_ONLY
+#ifndef DMA_ATTR_SYS_CACHE
 /* Attributes are not supported, so render them ineffective. */
-#define DMA_ATTR_SYS_CACHE_ONLY		(0UL)
-#define DMA_ATTR_SYS_CACHE_ONLY_NWA	(0UL)
+#define DMA_ATTR_SYS_CACHE		(0UL)
+#define DMA_ATTR_SYS_CACHE_NWA		(0UL)
 #endif
-
-/*
- * DMA_ATTR_IOMMU_USE_UPSTREAM_HINT: Normally an smmu will override any bus
- * attributes (i.e cacheablilty) provided by the client device. Some hardware
- * may be designed to use the original attributes instead.
- */
-#define DMA_ATTR_IOMMU_USE_UPSTREAM_HINT	(DMA_ATTR_SYS_CACHE_ONLY)
-
-/*
- * DMA_ATTR_IOMMU_USE_LLC_NWA: Overrides the bus attributes to use the System
- * Cache(LLC) with allocation policy as Inner Non-Cacheable, Outer Cacheable:
- * Write-Back, Read-Allocate, No Write-Allocate policy.
- */
-#define DMA_ATTR_IOMMU_USE_LLC_NWA	(DMA_ATTR_SYS_CACHE_ONLY_NWA)
