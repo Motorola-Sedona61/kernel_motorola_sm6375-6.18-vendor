@@ -24,6 +24,9 @@
 #include <trace/hooks/printk.h>
 #include <trace/hooks/timer.h>
 
+/* Exported by arch/arm64/mm/mmu.c; 6.18 no longer declares it in a header. */
+extern u64 kimage_vaddr;
+
 static DEFINE_PER_CPU(struct pt_regs, regs_before_stop);
 static DEFINE_RAW_SPINLOCK(stop_lock);
 
@@ -128,9 +131,9 @@ static void store_kaslr_offset(void)
 		return;
 
 	__raw_writel(0xdead4ead, mem);
-	__raw_writel(kaslr_offset() & KASLR_OFFSET_MASK,
+	__raw_writel((kimage_vaddr - KIMAGE_VADDR) & KASLR_OFFSET_MASK,
 		     mem + 4);
-	__raw_writel((kaslr_offset() >> 32) & KASLR_OFFSET_MASK,
+	__raw_writel(((kimage_vaddr - KIMAGE_VADDR) >> 32) & KASLR_OFFSET_MASK,
 		     mem + 8);
 
 	iounmap(mem);
