@@ -495,7 +495,7 @@ static int get_storage_info(struct ufs_hba *hba)
 
 	for_each_property_of_node(n, p) {
 		if (!strcmp(p->name, "manufacturer") && p->value)
-			//strlcpy(storage_mfrid, (char *)p->value, sizeof(storage_mfrid));
+			//strscpy(storage_mfrid, (char *)p->value, sizeof(storage_mfrid));
 			if(IS_SKHYNIX_DEVICE(p->value) || IS_HYNIX_DEVICE(p->value)) {
 				storage_mfrid = UFS_VENDOR_SKHYNIX;
 			}

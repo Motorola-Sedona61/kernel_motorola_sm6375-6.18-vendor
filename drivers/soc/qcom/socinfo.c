@@ -17,7 +17,7 @@
 #include <linux/types.h>
 #include <soc/qcom/socinfo.h>
 
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 
 /*
  * SoC version type with major number in the upper 16 bits and minor

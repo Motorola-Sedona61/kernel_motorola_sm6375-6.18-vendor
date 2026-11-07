@@ -310,8 +310,8 @@ static int atomic_pool_expand(struct gen_pool *pool, size_t pool_size,
 	void *addr;
 	int ret = -ENOMEM;
 
-	/* Cannot allocate larger than MAX_ORDER - 1 */
-	order = min(get_order(pool_size), MAX_ORDER - 1);
+	/* Cannot allocate larger than MAX_PAGE_ORDER */
+	order = min(get_order(pool_size), MAX_PAGE_ORDER);
 
 	do {
 		pool_size = 1 << (PAGE_SHIFT + order);
@@ -390,7 +390,7 @@ static int dma_atomic_pool_init(struct device *dev)
 	int ret = 0;
 	unsigned long pages;
 
-	/* Default the pool size to 128KB per 1 GB of memory, min 128 KB, max MAX_ORDER - 1. */
+	/* Default the pool size to 128KB per 1 GB of memory, min 128 KB, max MAX_PAGE_ORDER. */
 	pages = totalram_pages() / (SZ_1G / SZ_128K);
 	pages = min_t(unsigned long, pages, MAX_ORDER_NR_PAGES);
 	atomic_pool_size = max_t(size_t, pages << PAGE_SHIFT, SZ_128K);
