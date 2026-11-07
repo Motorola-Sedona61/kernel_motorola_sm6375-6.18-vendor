@@ -63,6 +63,14 @@ static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 
 	if (is_on) {
 		/*
+		 * Setup USB GSI event buffer as controller soft reset has cleared
+		 * configured event buffer. This used to hook __dwc3_gadget_start(),
+		 * which 6.18 inlines; dwc3_gadget_soft_connect() calls run_stop(true)
+		 * right after it.
+		 */
+		dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_SETUP, 0);
+
+		/*
 		 * DWC3 gadget IRQ uses a threaded handler which normally runs
 		 * at SCHED_FIFO priority.  If it gets busy processing a high
 		 * volume of events (usually EP events due to heavy traffic) it
@@ -158,20 +166,6 @@ static int exit_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 	return 0;
 }
 
-static int entry___dwc3_gadget_start(struct kretprobe_instance *ri,
-				   struct pt_regs *regs)
-{
-	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
-
-	/*
-	 * Setup USB GSI event buffer as controller soft reset has cleared
-	 * configured event buffer.
-	 */
-	dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_SETUP, 0);
-
-	return 0;
-}
-
 static int entry_trace_event_raw_event_dwc3_log_request(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
@@ -248,7 +242,6 @@ static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(dwc3_gadget_reset_interrupt),
 	ENTRY(__dwc3_gadget_ep_enable),
 	ENTRY_EXIT(dwc3_gadget_pullup),
-	ENTRY(__dwc3_gadget_start),
 	ENTRY_EXIT(usb_ep_set_maxpacket_limit),
 	ENTRY(trace_event_raw_event_dwc3_log_request),
 	ENTRY(trace_event_raw_event_dwc3_log_gadget_ep_cmd),
