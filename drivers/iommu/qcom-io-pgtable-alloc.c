@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
 #include <linux/shrinker.h>
 #include <linux/slab.h>
-#include <linux/qcom_scm.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 
 #include <soc/qcom/secure_buffer.h>
+#include "drivers/iommu/iommu-pages.h"
 
 struct io_pgtable_pool {
 	u32 vmid;
@@ -36,11 +37,11 @@ static int io_pgtable_hyp_assign_page(u32 vmid, struct page *page)
 	phys_addr_t page_addr = page_to_phys(page);
 	int ret;
 
-	ret = qcom_scm_assign_mem(page_addr, PAGE_SIZE, &src_vmid_list,
+	ret = qcom_scm_assign_mem(page_to_phys(page), PAGE_SIZE, &src_vmid_list,
 			      dst_vmids, ARRAY_SIZE(dst_vmids));
 	if (ret)
-		pr_debug("failed qcom_assign for %pa address of size %zx - subsys VMid %d rc:%d\n",
-			 &page_addr, PAGE_SIZE, vmid, ret);
+		pr_err("failed qcom_assign for %pa address of size %zx - subsys VMid %d rc:%d\n",
+			&page_addr, PAGE_SIZE, vmid, ret);
 
 	WARN(ret, "failed to assign memory to VMID: %u rc:%d\n", vmid, ret);
 	return ret ? -EADDRNOTAVAIL : 0;
@@ -54,11 +55,11 @@ static int io_pgtable_hyp_unassign_page(u32 vmid, struct page *page)
 	phys_addr_t page_addr = page_to_phys(page);
 	int ret;
 
-	ret = qcom_scm_assign_mem(page_addr, PAGE_SIZE, &src_vmid_list,
+	ret = qcom_scm_assign_mem(page_to_phys(page), PAGE_SIZE, &src_vmid_list,
 			      dst_vmids, ARRAY_SIZE(dst_vmids));
 	if (ret)
-		pr_debug("failed qcom_assign for unassigning %pa address of size %zx - subsys VMid %d rc:%d\n",
-			 &page_addr, PAGE_SIZE, vmid, ret);
+		pr_err("failed qcom_assign for unassigning %pa address of size %zx - subsys VMid %d rc:%d\n",
+			&page_addr, PAGE_SIZE, vmid, ret);
 
 	WARN(ret, "failed to unassign memory from VMID: %u rc: %d\n", vmid, ret);
 	return ret ? -EADDRNOTAVAIL : 0;
@@ -122,7 +123,7 @@ static void io_pgtable_pool_release(struct kref *ref)
 	page = __alloc_page_from_pool(&pool->page_pool);
 	while (page) {
 		if (!secure_vmid || !io_pgtable_hyp_unassign_page(pool->vmid, page))
-			__free_page(page);
+			__iommu_free_pages(page, 0);
 
 		page = __alloc_page_from_pool(&pool->page_pool);
 	}
@@ -218,7 +219,7 @@ struct page *qcom_io_pgtable_alloc_page(u32 vmid, gfp_t gfp)
 	if (page)
 		return page;
 
-	page = alloc_page(gfp);
+	page = __iommu_alloc_pages(gfp, 0);
 	if (!page)
 		return NULL;
 	/* The page may be inaccessible if this is true, so leak it. */
@@ -298,7 +299,7 @@ static unsigned long io_pgtable_alloc_scan_objects(struct shrinker *shrinker,
 		list_del(&page->lru);
 
 		if (!is_secure_vmid(vmid) || !io_pgtable_hyp_unassign_page(vmid, page))
-			__free_page(page);
+			__iommu_free_pages(page, 0);
 		else
 			count--;
 	}
@@ -306,18 +307,25 @@ static unsigned long io_pgtable_alloc_scan_objects(struct shrinker *shrinker,
 	return count;
 }
 
-static struct shrinker io_pgtable_alloc_shrinker = {
-	.count_objects = io_pgtable_alloc_count_objects,
-	.scan_objects = io_pgtable_alloc_scan_objects,
-	.seeks = DEFAULT_SEEKS,
-};
+static struct shrinker *io_pgtable_alloc_shrinker;
 
 int qcom_io_pgtable_alloc_init(void)
 {
-	return register_shrinker(&io_pgtable_alloc_shrinker, "io_pgtable_alloc");
+	io_pgtable_alloc_shrinker = shrinker_alloc(0, "io_pgtable_alloc");
+	if (!io_pgtable_alloc_shrinker)
+		return -ENOMEM;
+
+	io_pgtable_alloc_shrinker->count_objects = io_pgtable_alloc_count_objects;
+	io_pgtable_alloc_shrinker->scan_objects = io_pgtable_alloc_scan_objects;
+
+	io_pgtable_alloc_shrinker->seeks = DEFAULT_SEEKS;
+
+	shrinker_register(io_pgtable_alloc_shrinker);
+
+	return 0;
 }
 
 void qcom_io_pgtable_alloc_exit(void)
 {
-	unregister_shrinker(&io_pgtable_alloc_shrinker);
+	shrinker_free(io_pgtable_alloc_shrinker);
 }

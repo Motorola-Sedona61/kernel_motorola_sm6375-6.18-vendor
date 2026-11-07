@@ -11,7 +11,6 @@
  */
 
 
-#include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -30,6 +29,7 @@
 #include <linux/qcom-iommu-util.h>
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
+#include <linux/vmalloc.h>
 #include "qcom-dma-iommu-generic.h"
 
 static bool probe_finished;
@@ -311,8 +311,8 @@ static int atomic_pool_expand(struct gen_pool *pool, size_t pool_size,
 	void *addr;
 	int ret = -ENOMEM;
 
-	/* Cannot allocate larger than MAX_PAGE_ORDER */
-	order = min(get_order(pool_size), MAX_PAGE_ORDER);
+	/* Cannot allocate larger than MAX_PAGE_ORDER - 1 */
+	order = min(get_order(pool_size),  MAX_PAGE_ORDER - 1);
 
 	do {
 		pool_size = 1 << (PAGE_SHIFT + order);
@@ -391,7 +391,7 @@ static int dma_atomic_pool_init(struct device *dev)
 	int ret = 0;
 	unsigned long pages;
 
-	/* Default the pool size to 128KB per 1 GB of memory, min 128 KB, max MAX_PAGE_ORDER. */
+	/* Default the pool size to 128KB per 1 GB of memory, min 128 KB, max MAX_ORDER - 1. */
 	pages = totalram_pages() / (SZ_1G / SZ_128K);
 	pages = min_t(unsigned long, pages, MAX_ORDER_NR_PAGES);
 	atomic_pool_size = max_t(size_t, pages << PAGE_SHIFT, SZ_128K);
@@ -512,10 +512,10 @@ int qcom_dma_info_to_prot(enum dma_data_direction dir, bool coherent,
 	if (attrs & DMA_ATTR_PRIVILEGED)
 		prot |= IOMMU_PRIV;
 
-	if (attrs & DMA_ATTR_SYS_CACHE_ONLY)
+	if (attrs & DMA_ATTR_SYS_CACHE)
 		prot |= IOMMU_SYS_CACHE;
 
-	if (attrs & DMA_ATTR_SYS_CACHE_ONLY_NWA)
+	if (attrs & DMA_ATTR_SYS_CACHE_NWA)
 		prot |= IOMMU_SYS_CACHE_NWA;
 
 	switch (dir) {

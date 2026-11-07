@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
@@ -274,8 +274,12 @@ static void fast_smmu_unmap_page(struct device *dev, dma_addr_t iova,
 	}
 
 	spin_lock_irqsave(&mapping->lock, flags);
-	av8l_fast_unmap_public(mapping->pgtbl_ops, iova, len);
+
+	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, iova, len)))
+		goto fail;
+
 	__fast_smmu_free_iova(mapping, iova, len);
+fail:
 	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
@@ -406,7 +410,8 @@ static void fast_smmu_unmap_sg(struct device *dev,
 	len = ALIGN(sg_dma_address(sg) + sg_dma_len(sg) - (start - offset),
 		    FAST_PAGE_SIZE);
 
-	av8l_fast_unmap_public(mapping->pgtbl_ops, start, len);
+	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, start, len)))
+		return;
 
 	spin_lock_irqsave(&mapping->lock, flags);
 	__fast_smmu_free_iova(mapping, start, len);
@@ -672,7 +677,10 @@ static void fast_smmu_free(struct device *dev, size_t size,
 	size = ALIGN(size, FAST_PAGE_SIZE);
 
 	spin_lock_irqsave(&mapping->lock, flags);
-	av8l_fast_unmap_public(mapping->pgtbl_ops, dma_handle, size);
+
+	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, dma_handle, size)))
+		goto fail;
+
 	__fast_smmu_free_iova(mapping, dma_handle, size);
 	spin_unlock_irqrestore(&mapping->lock, flags);
 
@@ -693,6 +701,11 @@ static void fast_smmu_free(struct device *dev, size_t size,
 
 	if (page)
 		qcom_dma_free_contiguous(dev, page, size);
+
+	return;
+
+fail:
+	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
 static int fast_smmu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
@@ -732,7 +745,7 @@ static dma_addr_t fast_smmu_dma_map_resource(
 	prot |= IOMMU_MMIO;
 
 	if (iommu_map(mapping->domain, dma_addr, phys_addr - offset,
-			len, prot)) {
+			len, prot, GFP_ATOMIC)) {
 		spin_lock_irqsave(&mapping->lock, flags);
 		__fast_smmu_free_iova(mapping, dma_addr, len);
 		spin_unlock_irqrestore(&mapping->lock, flags);
@@ -921,7 +934,7 @@ static void fast_smmu_reserve_pci_windows(struct device *dev,
 
 static void fast_smmu_reserve_msi_iova(struct device *dev, struct dma_fast_smmu_mapping *fast)
 {
-	dma_addr_t msi_iova_base;
+	dma_addr_t msi_iova_base, msi_iova_end;
 	u32 msi_size;
 	int ret;
 	unsigned long flags;
@@ -942,8 +955,9 @@ static void fast_smmu_reserve_msi_iova(struct device *dev, struct dma_fast_smmu_
 			msi_size);
 		goto out;
 	}
-	dev_dbg(dev, "iova allocator reserved 0x%llx-0x%llx for MSI\n", msi_iova_base,
-		msi_iova_base + msi_size);
+	msi_iova_end = msi_iova_base + msi_size - 1;
+	dev_dbg(dev, "iova allocator reserved 0x%pad-0x%pad for MSI\n", &msi_iova_base,
+		&msi_iova_end);
 	spin_unlock_irqrestore(&fast->lock, flags);
 
 	ret = iommu_get_msi_cookie(fast->domain, msi_iova_base);
@@ -1060,8 +1074,7 @@ int fast_smmu_init_mapping(struct device *dev, struct iommu_domain *domain,
 }
 EXPORT_SYMBOL(fast_smmu_init_mapping);
 
-static void __fast_smmu_setup_dma_ops(void *data, struct device *dev,
-					u64 dma_base, u64 dma_limit)
+static void __fast_smmu_setup_dma_ops(void *data, struct device *dev)
 {
 	struct dma_fast_smmu_mapping *fast;
 	struct iommu_domain *domain;
@@ -1089,9 +1102,9 @@ static void __fast_smmu_setup_dma_ops(void *data, struct device *dev,
  * Called by drivers who create their own iommu domains via
  * iommu_domain_alloc().
  */
-void fast_smmu_setup_dma_ops(struct device *dev, u64 dma_base, u64 dma_limit)
+void fast_smmu_setup_dma_ops(struct device *dev)
 {
-	__fast_smmu_setup_dma_ops(NULL, dev, dma_base, dma_limit);
+	__fast_smmu_setup_dma_ops(NULL, dev);
 }
 EXPORT_SYMBOL(fast_smmu_setup_dma_ops);
 

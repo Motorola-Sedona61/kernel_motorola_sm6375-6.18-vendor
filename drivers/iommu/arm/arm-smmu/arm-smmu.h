@@ -6,7 +6,7 @@
  *
  * Author: Will Deacon <will.deacon@arm.com>
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _ARM_SMMU_H
@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <linux/qcom-iommu-util.h>
 #include <linux/qcom-io-pgtable.h>
+#include <linux/genalloc.h>
 
 /* Configuration registers */
 #define ARM_SMMU_GR0_sCR0		0x0
@@ -145,6 +146,7 @@ enum arm_smmu_cbar_type {
 
 #define ARM_SMMU_GR1_CBFRSYNRA(n)	(0x400 + ((n) << 2))
 #define CBFRSYNRA_SID_MASK		(0xffff)
+#define ARM_SMMU_CBFRSYNRA_SID		GENMASK(15, 0)
 
 #define ARM_SMMU_GR1_CBA2R(n)		(0x800 + ((n) << 2))
 #define ARM_SMMU_CBA2R_VMID16		GENMASK(31, 16)
@@ -215,43 +217,47 @@ enum arm_smmu_cbar_type {
 #define ARM_SMMU_CB_PAR_F		BIT(0)
 
 #define ARM_SMMU_CB_FSR			0x58
-#define ARM_SMMU_FSR_MULTI		BIT(31)
-#define ARM_SMMU_FSR_SS			BIT(30)
-#define ARM_SMMU_FSR_UUT		BIT(8)
-#define ARM_SMMU_FSR_ASF		BIT(7)
-#define ARM_SMMU_FSR_TLBLKF		BIT(6)
-#define ARM_SMMU_FSR_TLBMCF		BIT(5)
-#define ARM_SMMU_FSR_EF			BIT(4)
-#define ARM_SMMU_FSR_PF			BIT(3)
-#define ARM_SMMU_FSR_AFF		BIT(2)
-#define ARM_SMMU_FSR_TF			BIT(1)
+#define ARM_SMMU_CB_FSR_MULTI		BIT(31)
+#define ARM_SMMU_CB_FSR_SS		BIT(30)
+#define ARM_SMMU_CB_FSR_FORMAT		GENMASK(10, 9)
+#define ARM_SMMU_CB_FSR_UUT		BIT(8)
+#define ARM_SMMU_CB_FSR_ASF		BIT(7)
+#define ARM_SMMU_CB_FSR_TLBLKF		BIT(6)
+#define ARM_SMMU_CB_FSR_TLBMCF		BIT(5)
+#define ARM_SMMU_CB_FSR_EF		BIT(4)
+#define ARM_SMMU_CB_FSR_PF		BIT(3)
+#define ARM_SMMU_CB_FSR_AFF		BIT(2)
+#define ARM_SMMU_CB_FSR_TF		BIT(1)
 
-#define ARM_SMMU_FSR_IGN		(ARM_SMMU_FSR_AFF |		\
-					 ARM_SMMU_FSR_ASF |		\
-					 ARM_SMMU_FSR_TLBMCF |		\
-					 ARM_SMMU_FSR_TLBLKF)
+#define ARM_SMMU_CB_FSR_IGN		(ARM_SMMU_CB_FSR_AFF |		\
+					 ARM_SMMU_CB_FSR_ASF |		\
+					 ARM_SMMU_CB_FSR_TLBMCF |	\
+					 ARM_SMMU_CB_FSR_TLBLKF)
 
-#define ARM_SMMU_FSR_FAULT		(ARM_SMMU_FSR_MULTI |		\
-					 ARM_SMMU_FSR_SS |		\
-					 ARM_SMMU_FSR_UUT |		\
-					 ARM_SMMU_FSR_EF |		\
-					 ARM_SMMU_FSR_PF |		\
-					 ARM_SMMU_FSR_TF |		\
-					 ARM_SMMU_FSR_IGN)
+#define ARM_SMMU_CB_FSR_FAULT		(ARM_SMMU_CB_FSR_MULTI |	\
+					 ARM_SMMU_CB_FSR_SS |		\
+					 ARM_SMMU_CB_FSR_UUT |		\
+					 ARM_SMMU_CB_FSR_EF |		\
+					 ARM_SMMU_CB_FSR_PF |		\
+					 ARM_SMMU_CB_FSR_TF |		\
+					 ARM_SMMU_CB_FSR_IGN)
 
 #define ARM_SMMU_CB_FSRRESTORE		0x5c
 #define ARM_SMMU_CB_FAR			0x60
 
 #define ARM_SMMU_CB_FSYNR0		0x68
-#define ARM_SMMU_FSYNR0_WNR		BIT(4)
-#define ARM_SMMU_FSYNR0_PNU		BIT(5)
-#define ARM_SMMU_FSYNR0_IND		BIT(6)
-#define ARM_SMMU_FSYNR0_NSATTR		BIT(8)
 
-#define ARM_SMMU_CB_FSYNR1		0x6c
 #define ARM_SMMU_FSYNR1_BID		GENMASK(15, 13)
 #define ARM_SMMU_FSYNR1_PID		GENMASK(12, 8)
 #define ARM_SMMU_FSYNR1_MID		GENMASK(7, 0)
+#define ARM_SMMU_CB_FSYNR0_PLVL		GENMASK(1, 0)
+#define ARM_SMMU_CB_FSYNR0_WNR		BIT(4)
+#define ARM_SMMU_CB_FSYNR0_PNU		BIT(5)
+#define ARM_SMMU_CB_FSYNR0_IND		BIT(6)
+#define ARM_SMMU_CB_FSYNR0_NSATTR	BIT(8)
+#define ARM_SMMU_CB_FSYNR0_PTWF		BIT(10)
+#define ARM_SMMU_CB_FSYNR0_AFR		BIT(11)
+#define ARM_SMMU_CB_FSYNR0_S1CBNDX	GENMASK(23, 16)
 
 #define ARM_SMMU_CB_FSYNR1		0x6c
 
@@ -283,8 +289,9 @@ enum arm_smmu_cbar_type {
 #define TCU_INV_IN_PRGSS		BIT(16)
 
 #define ARM_SMMU_CB_ATSR		0x8f0
-#define ARM_SMMU_ATSR_ACTIVE		BIT(0)
+#define ARM_SMMU_CB_ATSR_ACTIVE		BIT(0)
 
+#define ARM_SMMU_RESUME_TERMINATE	BIT(0)
 
 /* Maximum number of context banks per SMMU */
 #define ARM_SMMU_MAX_CBS		128
@@ -312,6 +319,8 @@ enum arm_smmu_implementation {
  * Describes resources required for on/off power operation.
  * Separate reference count is provided for atomic/nonatomic
  * operations.
+ * gdscs - on kernel 6.6, power domains are used instead. This
+ * field can be removed once no legacy targets using it remain.
  */
 struct arm_smmu_power_resources {
 	struct device			*dev;
@@ -469,7 +478,6 @@ enum arm_smmu_domain_stage {
 	ARM_SMMU_DOMAIN_S1 = 0,
 	ARM_SMMU_DOMAIN_S2,
 	ARM_SMMU_DOMAIN_NESTED,
-	ARM_SMMU_DOMAIN_BYPASS,
 };
 
 struct arm_smmu_fault_model {
@@ -501,6 +509,7 @@ struct arm_smmu_domain {
 	struct arm_smmu_mapping_cfg	mapping_cfg;
 	bool				delayed_s1_trans_enable;
 	u32				secure_vmid;
+	struct gen_pool			*secure_mem_pool;
 	fault_handler_irq_t		fault_handler_irq;
 	void				*handler_irq_token;
 
@@ -512,7 +521,6 @@ struct arm_smmu_domain {
 	struct list_head		*freelist;
 	bool				deferred_flush;
 
-	struct iommu_debug_attachment	*logger;
 	struct iommu_domain		domain;
 	struct qcom_io_pgtable_info	pgtbl_info;
 	enum io_pgtable_fmt		pgtbl_fmt;
@@ -713,7 +721,14 @@ static inline void arm_smmu_writeq(struct arm_smmu_device *smmu, int page,
 	arm_smmu_writeq((s), ARM_SMMU_CB((s), (n)), (o), (v))
 
 struct arm_smmu_device *arm_smmu_impl_init(struct arm_smmu_device *smmu);
+#if IS_ENABLED(CONFIG_ARM_SMMU_NVIDIA)
 struct arm_smmu_device *nvidia_smmu_impl_init(struct arm_smmu_device *smmu);
+#else
+static inline struct arm_smmu_device *nvidia_smmu_impl_init(struct arm_smmu_device *smmu)
+{
+	return smmu;
+}
+#endif
 struct arm_smmu_device *qcom_smmu_impl_init(struct arm_smmu_device *smmu);
 struct arm_smmu_device *qsmmuv500_impl_init(struct arm_smmu_device *smmu);
 struct arm_smmu_device *qsmmuv2_impl_init(struct arm_smmu_device *smmu);
@@ -732,5 +747,18 @@ extern struct platform_driver qsmmuv500_tbu_driver;
 
 /* Misc. constants */
 #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
+
+struct arm_smmu_context_fault_info {
+	unsigned long iova;
+	u32 fsr;
+	u32 fsynr;
+	u32 cbfrsynra;
+};
+
+void arm_smmu_read_context_fault_info(struct arm_smmu_device *smmu, int idx,
+				      struct arm_smmu_context_fault_info *cfi);
+
+void arm_smmu_print_context_fault_info(struct arm_smmu_device *smmu, int idx,
+				       const struct arm_smmu_context_fault_info *cfi);
 
 #endif /* _ARM_SMMU_H */

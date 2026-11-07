@@ -6,7 +6,7 @@
  *	Copyright © 2006-2009, Intel Corporation.
  *
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/dma-mapping-fast.h>
@@ -15,9 +15,13 @@
 #include <linux/qcom-iommu-util.h>
 #include <linux/iova.h>
 #include <linux/qcom-io-pgtable.h>
+#include "drivers/iommu/iommu-priv.h"
+#include <linux/xarray.h>
 #include <trace/hooks/iommu.h>
 #include "qcom-dma-iommu-generic.h"
 #include "qcom-io-pgtable-alloc.h"
+
+static DEFINE_XARRAY(xa_qcom_iommu_ops);
 
 struct qcom_iommu_range_prop_cb_data {
 	int (*range_prop_entry_cb_fn)(const __be32 *p, int naddr, int nsize, void *arg);
@@ -76,163 +80,9 @@ static int of_property_walk_each_entry(struct device *dev, const char *propname,
 	return 0;
 }
 
-static bool check_overlap(struct iommu_resv_region *region, u64 start, u64 end)
-{
-	u64 region_end = region->start + region->length - 1;
-
-	return end >= region->start && start <= region_end;
-}
-
-static int insert_range(const __be32 *p, int naddr, int nsize, void *arg)
-{
-	struct list_head *head = arg;
-	struct iommu_resv_region *region, *new;
-	u64 start = of_read_number(p, naddr);
-	u64 end = start + of_read_number(p + naddr, nsize) - 1;
-
-	list_for_each_entry(region, head, list) {
-		if (check_overlap(region, start, end))
-			return -EINVAL;
-
-		if (start < region->start)
-			break;
-	}
-
-	new = iommu_alloc_resv_region(start, end - start + 1,
-					0, IOMMU_RESV_RESERVED, GFP_KERNEL);
-	if (!new)
-		return -ENOMEM;
-	list_add_tail(&new->list, &region->list);
-	return 0;
-}
-
-/*
- * Returns a sorted list of all regions described by the
- * "qcom,iommu-dma-addr-pool" property.
- *
- * Caller is responsible for freeing the entries on the list via
- * iommu_put_resv_regions
- */
-int qcom_iommu_generate_dma_regions(struct device *dev,
-		struct list_head *head)
-{
-	struct qcom_iommu_range_prop_cb_data insert_range_cb_data = {
-		.range_prop_entry_cb_fn = insert_range,
-		.arg = head,
-	};
-
-	return of_property_walk_each_entry(dev, "qcom,iommu-dma-addr-pool",
-					   &insert_range_cb_data);
-}
-EXPORT_SYMBOL(qcom_iommu_generate_dma_regions);
-
-static int invert_regions(struct list_head *head, struct list_head *inverted)
-{
-	struct iommu_resv_region *prev, *curr, *new;
-	phys_addr_t rsv_start;
-	size_t rsv_size;
-	int ret = 0;
-
-	/*
-	 * Since its not possible to express start 0, size 1<<64 return
-	 * an error instead. Also an iova allocator without any iovas doesn't
-	 * make sense.
-	 */
-	if (list_empty(head))
-		return -EINVAL;
-
-	/*
-	 * Handle case where there is a non-zero sized area between
-	 * iommu_resv_regions A & B.
-	 */
-	prev = NULL;
-	list_for_each_entry(curr, head, list) {
-		if (!prev)
-			goto next;
-
-		rsv_start = prev->start + prev->length;
-		rsv_size = curr->start - rsv_start;
-		if (!rsv_size)
-			goto next;
-
-		new = iommu_alloc_resv_region(rsv_start, rsv_size,
-						0, IOMMU_RESV_RESERVED, GFP_KERNEL);
-		if (!new) {
-			ret = -ENOMEM;
-			goto out_err;
-		}
-		list_add_tail(&new->list, inverted);
-next:
-		prev = curr;
-	}
-
-	/* Now handle the beginning */
-	curr = list_first_entry(head, struct iommu_resv_region, list);
-	rsv_start = 0;
-	rsv_size = curr->start;
-	if (rsv_size) {
-		new = iommu_alloc_resv_region(rsv_start, rsv_size,
-						0, IOMMU_RESV_RESERVED, GFP_KERNEL);
-		if (!new) {
-			ret = -ENOMEM;
-			goto out_err;
-		}
-		list_add(&new->list, inverted);
-	}
-
-	/* Handle the end - checking for overflow */
-	rsv_start = prev->start + prev->length;
-	rsv_size = -rsv_start;
-
-	if (rsv_size && (U64_MAX - prev->start > prev->length)) {
-		new = iommu_alloc_resv_region(rsv_start, rsv_size,
-						0, IOMMU_RESV_RESERVED, GFP_KERNEL);
-		if (!new) {
-			ret = -ENOMEM;
-			goto out_err;
-		}
-		list_add_tail(&new->list, inverted);
-	}
-
-	return 0;
-
-out_err:
-	list_for_each_entry_safe(curr, prev, inverted, list)
-		kfree(curr);
-	return ret;
-}
-
-/* Used by iommu drivers to generate reserved regions for qcom,iommu-dma-addr-pool property */
-void qcom_iommu_generate_resv_regions(struct device *dev,
-				      struct list_head *head)
-{
-	struct iommu_resv_region *region;
-	LIST_HEAD(dma_regions);
-	LIST_HEAD(resv_regions);
-	int ret;
-
-	ret = qcom_iommu_generate_dma_regions(dev, &dma_regions);
-	if (ret)
-		return;
-
-	ret = invert_regions(&dma_regions, &resv_regions);
-	iommu_put_resv_regions(dev, &dma_regions);
-	if (ret)
-		return;
-
-	list_for_each_entry(region, &resv_regions, list) {
-		dev_dbg(dev, "Reserved region %llx-%llx\n",
-			(u64)region->start,
-			(u64)(region->start + region->length - 1));
-	}
-
-	list_splice(&resv_regions, head);
-}
-EXPORT_SYMBOL(qcom_iommu_generate_resv_regions);
-
 void qcom_iommu_get_resv_regions(struct device *dev, struct list_head *list)
 {
-	const struct iommu_ops *ops = dev->bus->iommu_ops;
+	const struct iommu_ops *ops = dev_iommu_ops(dev);
 
 	if (ops && ops->get_resv_regions)
 		ops->get_resv_regions(dev, list);
@@ -257,6 +107,145 @@ static int get_addr_range(const __be32 *p, int naddr, int nsize, void *arg)
 	return 0;
 }
 
+/*
+ * similar to list_for_each_entry_safe_reverse from include/linux/list.h,
+ * except starting position is prior to pos, instead of the list tail.
+ */
+#define list_for_each_entry_safe_continue_reverse(pos, n, head, member)		\
+	for (pos = list_prev_entry(pos, member),			\
+		n = list_prev_entry(pos, member);			\
+	     !list_entry_is_head(pos, head, member);			\
+	     pos = n, n = list_prev_entry(n, member))
+
+/*
+ * "new" has been added to list in sorted order, but may overlap with preceding
+ * or following entries. Merge as required, deleting old nodes.
+ *
+ * A valid region has following properties:
+ * A.length > 0
+ * A.end == A.length + A.start - 1 does not overflow or underflow.
+ * A.end is in range [0, U64_MAX]
+ * A.start is in range [0, U64_MAX]
+ *
+ * This causes an issue when checking if A.start is adjacent to B.end:
+ * B.end + 1 can overflow, and A.start - 1 can underflow.
+ *
+ * This is resolved by short ciruiting the comparison if A.start == 0.
+ */
+static void merge_resv_region(struct list_head *list, struct iommu_resv_region *new)
+{
+	struct iommu_resv_region *cur, *tmp;
+	u64 new_end, cur_end, end, start;
+
+	/* Merge against entries with smaller start address */
+	cur = new;
+	list_for_each_entry_safe_continue_reverse(cur, tmp, list, list) {
+		new_end = new->start + new->length - 1;
+		cur_end = cur->start + cur->length - 1;
+		if (new->start && new->start - 1 > cur_end)
+			break;
+
+		start = min(new->start, cur->start);
+		end = max(new_end, cur_end);
+		pr_debug("%s: Merging %llx-%llx into %llx-%llx\n",
+			__func__, new->start, new_end, cur->start, cur_end);
+
+		list_del(&cur->list);
+		kfree(cur);
+		new->start = start;
+		new->length = end + 1 - new->start;
+	}
+
+	/* Merge against entries with greater start address */
+	cur = new;
+	list_for_each_entry_safe_continue(cur, tmp, list, list) {
+		new_end = new->start + new->length - 1;
+		cur_end = cur->start + cur->length - 1;
+		if (cur->start && new_end < cur->start - 1)
+			break;
+
+		start = min(new->start, cur->start);
+		end = max(new_end, cur_end);
+		pr_debug("%s: Merging %llx-%llx into %llx-%llx\n",
+			__func__, new->start, new_end, cur->start, cur_end);
+
+		list_del(&cur->list);
+		kfree(cur);
+		new->start = start;
+		new->length = end + 1 - new->start;
+	}
+}
+
+/*
+ * On success, dma_range contains a single range which spans all usable addresses.
+ * Returns -ENODEV if property not present, or another negative value on error
+ */
+static int get_iova_range_from_iommu_addresses(struct device *dev, struct iova_range *dma_range,
+						u64 fastmap_max_iova)
+{
+	LIST_HEAD(list);
+	LIST_HEAD(mergelist);
+	struct iommu_resv_region *new, *region, *x;
+	int ret = -EINVAL;
+	bool found = false;
+	struct of_phandle_iterator it;
+
+	of_for_each_phandle(&it, ret, dev->of_node, "memory-region", NULL, 0) {
+		if (of_find_property(it.node, "iommu-addresses", NULL)) {
+			found = true;
+			break;
+		}
+	}
+	if (!found)
+		return -ENODEV;
+
+	qcom_iommu_get_resv_regions(dev, &list);
+	if (list_empty(&list)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	list_for_each_entry(region, &list, list) {
+		new = kmemdup(region, sizeof(*region), GFP_KERNEL);
+		if (!new) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		list_for_each_entry(x, &mergelist, list)
+			if (x->start > new->start)
+				break;
+		list_add_tail(&new->list, &x->list);
+		merge_resv_region(&mergelist, new);
+	}
+
+	pr_debug("%s: Sorted & Merged iommu-address regions\n", __func__);
+	list_for_each_entry(x, &mergelist, list)
+		pr_debug("%s: %llx-%llx\n", __func__, x->start, x->start + x->length - 1);
+
+	region = list_first_entry(&mergelist, struct iommu_resv_region, list);
+	dma_range->base = 0;
+	if (region->start == 0)
+		dma_range->base = region->start + region->length;
+
+	region = list_last_entry(&mergelist, struct iommu_resv_region, list);
+	dma_range->end = fastmap_max_iova;
+	if (region->start <= fastmap_max_iova &&
+	    region->start + region->length - 1 >= fastmap_max_iova)
+		dma_range->end = region->start - 1;
+
+	pr_debug("%s: Result: %llx-%llx\n", __func__, dma_range->base, dma_range->end);
+	ret = 0;
+
+out:
+	list_for_each_entry_safe(region, x, &mergelist, list) {
+		list_del(&region->list);
+		kfree(region);
+	}
+	iommu_put_resv_regions(dev, &list);
+	return ret;
+}
+
 int qcom_iommu_get_fast_iova_range(struct device *dev, dma_addr_t *ret_iova_base,
 				   dma_addr_t *ret_iova_end)
 {
@@ -266,18 +255,34 @@ int qcom_iommu_get_fast_iova_range(struct device *dev, dma_addr_t *ret_iova_base
 		.range_prop_entry_cb_fn = get_addr_range,
 	};
 	int ret;
+	u64 fastmap_max_iova = SZ_4G - 1;
+	struct device_node *np;
 
 	if (!dev || !ret_iova_base || !ret_iova_end)
 		return -EINVAL;
 
+	np = qcom_iommu_group_parse_phandle(dev);
+	if (!np)
+		return -EINVAL;
+
 	get_addr_range_cb_data.arg = &dma_range;
-	ret = of_property_walk_each_entry(dev, "qcom,iommu-dma-addr-pool",
-					  &get_addr_range_cb_data);
-	if (ret == -ENODEV) {
-		dma_range.base = 0;
-		dma_range.end = SZ_4G - 1;
-	} else if (ret) {
+
+	/*
+	 * Legacy property - should be removed post kernel version 6.6.
+	 */
+	if (of_property_present(np, "qcom,iommu-dma-addr-pool")) {
+		WARN(1, "qcom,iommu-dma-addr-pool is deprecated. Switch to using iommu-addresses.");
+		return -EINVAL;
+	}
+
+	ret = get_iova_range_from_iommu_addresses(dev, &dma_range,
+						  fastmap_max_iova);
+	if (ret && ret != -ENODEV) {
+		dev_err(dev, "Parsing iommu-addresses into set failed with %d\n", ret);
 		return ret;
+	} else if (ret) {
+		dma_range.base = 0;
+		dma_range.end = fastmap_max_iova;
 	}
 
 	get_addr_range_cb_data.arg = &geometry_range;
@@ -285,7 +290,7 @@ int qcom_iommu_get_fast_iova_range(struct device *dev, dma_addr_t *ret_iova_base
 					  &get_addr_range_cb_data);
 	if (ret == -ENODEV) {
 		geometry_range.base = 0;
-		geometry_range.end = SZ_4G - 1;
+		geometry_range.end = fastmap_max_iova;
 	} else if (ret) {
 		return ret;
 	}
@@ -296,12 +301,35 @@ int qcom_iommu_get_fast_iova_range(struct device *dev, dma_addr_t *ret_iova_base
 }
 EXPORT_SYMBOL(qcom_iommu_get_fast_iova_range);
 
+/*
+ * Caller should check for NULL. Will return NULL for identity domains on
+ * kernel 6.8+
+ */
+static struct qcom_iommu_ops *to_qcom_iommu_ops(const struct iommu_domain_ops *ops)
+{
+	return xa_load(&xa_qcom_iommu_ops, (unsigned long)ops);
+}
+
+int register_qcom_iommu_ops(struct qcom_iommu_ops *ops)
+{
+	void *ret;
+
+	ret = xa_store(&xa_qcom_iommu_ops, (unsigned long)&ops->domain_ops,
+			ops, GFP_KERNEL);
+	if (xa_is_err(ret)) {
+		pr_err("Failed to register qcom_iommu_ops\n");
+		return xa_err(ret);
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(register_qcom_iommu_ops);
+
 phys_addr_t qcom_iommu_iova_to_phys_hard(struct iommu_domain *domain,
 				    struct qcom_iommu_atos_txn *txn)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->iova_to_phys_hard == NULL))
+	if (!ops || unlikely(ops->iova_to_phys_hard == NULL))
 		return 0;
 
 	return ops->iova_to_phys_hard(domain, txn);
@@ -318,7 +346,7 @@ int qcom_iommu_sid_switch(struct device *dev, enum sid_switch_direction dir)
 		return -EINVAL;
 
 	ops = to_qcom_iommu_ops(domain->ops);
-	if (unlikely(ops->sid_switch == NULL))
+	if (!ops || unlikely(ops->sid_switch == NULL))
 		return -EINVAL;
 
 	return ops->sid_switch(dev, dir);
@@ -330,7 +358,7 @@ int qcom_iommu_get_fault_ids(struct iommu_domain *domain,
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->get_fault_ids == NULL))
+	if (!ops || unlikely(ops->get_fault_ids == NULL))
 		return -EINVAL;
 
 	return ops->get_fault_ids(domain, f_ids);
@@ -347,13 +375,13 @@ int qcom_skip_tlb_management(struct device *dev, bool skip)
 		return -EINVAL;
 
 	ops = to_qcom_iommu_ops(domain->ops);
-	if (unlikely(ops->skip_tlb_management == NULL))
+	if (!ops || unlikely(ops->skip_tlb_management == NULL))
 		return -EINVAL;
 
 	ops->skip_tlb_management(domain, skip);
 	return 0;
 }
-EXPORT_SYMBOL(qcom_skip_tlb_management);
+EXPORT_SYMBOL_GPL(qcom_skip_tlb_management);
 
 int qcom_iommu_get_msi_size(struct device *dev, u32 *msi_size)
 {
@@ -369,7 +397,7 @@ int qcom_iommu_get_context_bank_nr(struct iommu_domain *domain)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->get_context_bank_nr == NULL))
+	if (!ops || unlikely(ops->get_context_bank_nr == NULL))
 		return -EINVAL;
 
 	return ops->get_context_bank_nr(domain);
@@ -380,7 +408,7 @@ int qcom_iommu_get_asid_nr(struct iommu_domain *domain)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->get_asid_nr == NULL))
+	if (!ops || unlikely(ops->get_asid_nr == NULL))
 		return -EINVAL;
 
 	return ops->get_asid_nr(domain);
@@ -391,7 +419,7 @@ int qcom_iommu_set_secure_vmid(struct iommu_domain *domain, enum vmid vmid)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->set_secure_vmid == NULL))
+	if (!ops || unlikely(ops->set_secure_vmid == NULL))
 		return -EINVAL;
 
 	return ops->set_secure_vmid(domain, vmid);
@@ -402,7 +430,7 @@ int qcom_iommu_set_fault_model(struct iommu_domain *domain, int fault_model)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->set_fault_model == NULL))
+	if (!ops || unlikely(ops->set_fault_model == NULL))
 		return -EINVAL;
 	else if (fault_model & ~(QCOM_IOMMU_FAULT_MODEL_NON_FATAL |
 				 QCOM_IOMMU_FAULT_MODEL_NO_CFRE |
@@ -414,29 +442,11 @@ int qcom_iommu_set_fault_model(struct iommu_domain *domain, int fault_model)
 }
 EXPORT_SYMBOL(qcom_iommu_set_fault_model);
 
-/*
- * Sets the client function which gets called during non-threaded irq
- * fault handler when registered.
- */
-int qcom_iommu_set_fault_handler_irq(struct iommu_domain *domain,
-	fault_handler_irq_t handler_irq, void *token)
-{
-	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
-
-	if (unlikely(ops->set_fault_handler_irq == NULL))
-		return -EINVAL;
-
-	ops->set_fault_handler_irq(domain, handler_irq, token);
-
-	return 0;
-}
-EXPORT_SYMBOL(qcom_iommu_set_fault_handler_irq);
-
 int qcom_iommu_enable_s1_translation(struct iommu_domain *domain)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->enable_s1_translation == NULL))
+	if (!ops || unlikely(ops->enable_s1_translation == NULL))
 		return -EINVAL;
 
 	return ops->enable_s1_translation(domain);
@@ -447,7 +457,7 @@ int qcom_iommu_get_mappings_configuration(struct iommu_domain *domain)
 {
 	struct qcom_iommu_ops *ops = to_qcom_iommu_ops(domain->ops);
 
-	if (unlikely(ops->get_mappings_configuration == NULL))
+	if (!ops || unlikely(ops->get_mappings_configuration == NULL))
 		return -EINVAL;
 
 	return ops->get_mappings_configuration(domain);
@@ -520,7 +530,8 @@ void qcom_free_io_pgtable_ops(struct io_pgtable_ops *ops)
 }
 EXPORT_SYMBOL(qcom_free_io_pgtable_ops);
 
-#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS) && defined(CONFIG_ANDROID_VENDOR_OEM_DATA)
+#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS) && \
+		defined(CONFIG_ANDROID_VENDOR_OEM_DATA)
 /*
  * iovad->vendor_data1 i.e, ANDROID_VENDOR_DATA(1), field is a 64-bit field.
  *
@@ -818,4 +829,4 @@ module_init(qcom_iommu_util_init);
 arch_initcall_sync(qcom_iommu_util_init);
 #endif
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __QCOM_IOMMU_UTIL_H
@@ -39,12 +39,6 @@
 #define IOMMU_SYS_CACHE		(0)
 #define IOMMU_SYS_CACHE_NWA	(0)
 #endif
-
-/* Use upstream device's bus attribute */
-#define IOMMU_USE_UPSTREAM_HINT	(IOMMU_SYS_CACHE)
-
-/* Use upstream device's bus attribute with no write-allocate cache policy */
-#define IOMMU_USE_LLC_NWA	(IOMMU_SYS_CACHE_NWA)
 
 /* vendor iommu fault flags */
 #define IOMMU_FAULT_TRANSLATION         (1 << 2)
@@ -106,13 +100,9 @@ struct qcom_iommu_ops {
 	struct iommu_ops iommu_ops;
 	struct iommu_domain_ops domain_ops;
 };
-#define to_qcom_iommu_ops(x) (container_of(x, struct qcom_iommu_ops, domain_ops))
+int register_qcom_iommu_ops(struct qcom_iommu_ops *ops);
 
 struct device_node *qcom_iommu_group_parse_phandle(struct device *dev);
-int qcom_iommu_generate_dma_regions(struct device *dev,
-				    struct list_head *head);
-void qcom_iommu_generate_resv_regions(struct device *dev,
-				      struct list_head *list);
 int qcom_iommu_get_fast_iova_range(struct device *dev,
 				   dma_addr_t *ret_iova_base,
 				   dma_addr_t *ret_iova_end);
@@ -138,9 +128,6 @@ int qcom_iommu_get_asid_nr(struct iommu_domain *domain);
 int qcom_iommu_set_secure_vmid(struct iommu_domain *domain, enum vmid vmid);
 
 int qcom_iommu_set_fault_model(struct iommu_domain *domain, int fault_model);
-
-int qcom_iommu_set_fault_handler_irq(struct iommu_domain *domain,
-		fault_handler_irq_t handler_irq, void *token);
 
 int qcom_iommu_enable_s1_translation(struct iommu_domain *domain);
 
