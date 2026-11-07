@@ -673,7 +673,7 @@ int cts_plat_spi_setup(struct cts_platform_data *pdata)
 {
     int ret;
 
-    pdata->spi_client->chip_select = 0;
+    spi_set_chipselect(pdata->spi_client, 0, 0);
     pdata->spi_client->mode = SPI_MODE_0;
     pdata->spi_client->bits_per_word = 8;
 

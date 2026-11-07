@@ -734,7 +734,7 @@ static const struct aw_sar_mode_set_t g_aw9610x_mode_set[] = {
 /**********************mode operation end*******************************/
 
 static const struct aw_sar_irq_init_t g_aw9610x_irq_init = {
-	.flags = GPIOF_DIR_IN | GPIOF_INIT_HIGH,
+	.flags = GPIOF_IN,
 	.irq_flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 	.handler = NULL,
 	.thread_fn = NULL,

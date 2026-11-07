@@ -951,7 +951,7 @@ error_hw:
 #if defined(USE_SPI_BUS)
 static int gf_remove(struct spi_device *spi)
 #elif defined(USE_PLATFORM_BUS)
-static int gf_remove(struct platform_device *pdev)
+static void gf_remove(struct platform_device *pdev)
 #endif
 {
 	struct gf_dev *gf_dev = &gf;
@@ -983,8 +983,6 @@ static int gf_remove(struct platform_device *pdev)
 	fb_unregister_client(&gf_dev->notifier);
 #endif
 	mutex_unlock(&device_list_lock);
-
-	return 0;
 }
 
 static const struct of_device_id gx_match_table[] = {
@@ -1022,7 +1020,7 @@ static int __init gf_init(void)
 		return status;
 	}
 	SPIDEV_MAJOR = status;
-	gf_class = class_create(THIS_MODULE, CLASS_NAME);
+	gf_class = class_create(CLASS_NAME);
 	if (IS_ERR(gf_class)) {
 		unregister_chrdev(SPIDEV_MAJOR, gf_driver.driver.name);
 		pr_warn("Failed to create class.\n");

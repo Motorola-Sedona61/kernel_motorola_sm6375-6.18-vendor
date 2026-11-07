@@ -4211,7 +4211,7 @@ int ilitek_sys_init(void)
 	} else {
 
 		/* set sysfs for firmware */
-		touchscreen_class = class_create(THIS_MODULE, "touchscreen");
+		touchscreen_class = class_create("touchscreen");
 		if (IS_ERR(touchscreen_class)) {
 			ret = PTR_ERR(touchscreen_class);
 			touchscreen_class = NULL;

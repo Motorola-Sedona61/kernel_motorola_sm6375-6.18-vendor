@@ -21,6 +21,7 @@
  */
 
 #include "ilitek_v3.h"
+#include <linux/of.h>
 #include <linux/soc/qcom/panel_event_notifier.h>
 #if defined(CONFIG_INPUT_TOUCHSCREEN_MMI)
 #include <linux/mmi_device.h>
@@ -272,11 +273,10 @@ static void ilitek_plat_regulator_power_init(void)
 static int ilitek_plat_gpio_register(void)
 {
 	int ret = 0;
-	u32 flag;
 	struct device_node *dev_node = ilits->dev->of_node;
 
-	ilits->tp_int = of_get_named_gpio_flags(dev_node, DTS_INT_GPIO, 0, &flag);
-	ilits->tp_rst = of_get_named_gpio_flags(dev_node, DTS_RESET_GPIO, 0, &flag);
+	ilits->tp_int = of_get_named_gpio(dev_node, DTS_INT_GPIO, 0);
+	ilits->tp_rst = of_get_named_gpio(dev_node, DTS_RESET_GPIO, 0);
 
 	ILI_INFO("TP INT: %d\n", ilits->tp_int);
 	ILI_INFO("TP RESET: %d\n", ilits->tp_rst);
@@ -1101,7 +1101,7 @@ late_initcall(ilitek_plat_dev_init);
 module_init(ilitek_plat_dev_init);
 #endif
 #if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+MODULE_IMPORT_NS("ANDROID_GKI_VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 #endif
 module_exit(ilitek_plat_dev_exit);
 MODULE_AUTHOR("ILITEK");

@@ -266,8 +266,7 @@ static int wl2864c_regulator_init(struct wl2864c *chip)
 	return 0;
 }
 
-static int wl2864c_i2c_probe(struct i2c_client *client,
-			      const struct i2c_device_id *id)
+static int wl2864c_i2c_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
 	struct wl2864c *chip;
@@ -367,7 +366,7 @@ static void wl2864c_i2c_remove(struct i2c_client *client)
 
 	if (chip->chip_cs_pin > 0) {
 		desc = gpio_to_desc(chip->chip_cs_pin);
-		gpiod_direction_output_raw(desc, GPIOF_INIT_LOW);
+		gpiod_direction_output_raw(desc, 0);
 	}
 }
 

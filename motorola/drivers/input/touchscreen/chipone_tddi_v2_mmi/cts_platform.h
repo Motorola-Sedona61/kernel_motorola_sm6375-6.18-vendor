@@ -44,7 +44,7 @@
 
 #include "cts_config.h"
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0)
-#include <asm-generic/unaligned.h>
+#include <linux/unaligned.h>
 #else
 #include <linux/unaligned/access_ok.h>
 #endif

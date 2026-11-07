@@ -573,7 +573,7 @@ int ili_core_spi_setup(int num)
 	ilits->spi->mode = SPI_MODE_0;
 	ilits->spi->bits_per_word = 8;
 	ilits->spi->max_speed_hz = freq[num];
-	ilits->spi->chip_select = 0;
+	spi_set_chipselect(ilits->spi, 0, 0);
 
 	if (spi_setup(ilits->spi) < 0) {
 		ILI_ERR("Failed to setup spi device\n");
@@ -582,8 +582,8 @@ int ili_core_spi_setup(int num)
 
 	ILI_INFO("name = %s, bus_num = %d,cs = %d, mode = %d, speed = %d\n",
 			ilits->spi->modalias,
-			ilits->spi->master->bus_num,
-			ilits->spi->chip_select,
+			ilits->spi->controller->bus_num,
+			spi_get_chipselect(ilits->spi, 0),
 			ilits->spi->mode,
 			ilits->spi->max_speed_hz);
 	return 0;
@@ -736,7 +736,7 @@ static int ilitek_spi_probe(struct spi_device *spi)
 		return -ENOMEM;
 	}
 
-	if (spi->master->flags & SPI_MASTER_HALF_DUPLEX) {
+	if (spi->controller->flags & SPI_CONTROLLER_HALF_DUPLEX) {
 		ILI_ERR("Full duplex not supported by master\n");
 		return -EIO;
 	}

@@ -205,10 +205,9 @@ static int fm_ctrl_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int fm_ctrl_remove(struct platform_device *pdev)
+static void fm_ctrl_remove(struct platform_device *pdev)
 {
 	device_init_wakeup(&pdev->dev, 0);
-	return 0;
 }
 
 

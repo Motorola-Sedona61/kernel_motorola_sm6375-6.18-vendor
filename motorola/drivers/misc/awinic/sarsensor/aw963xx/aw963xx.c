@@ -917,7 +917,7 @@ static const struct aw_sar_check_chipid_t g_aw963xx_check_chipid = {
 };
 
 static const struct aw_sar_irq_init_t g_aw963xx_irq_init = {
-	.flags = GPIOF_DIR_IN | GPIOF_INIT_HIGH,
+	.flags = GPIOF_IN,
 	.irq_flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 	.handler = NULL,
 	.thread_fn = NULL,
@@ -947,8 +947,8 @@ static const struct aw_sar_init_over_irq_t g_aw963xx_init_over_irq = {
 	.p_get_err_type_fn = NULL,
 };
 
-static ssize_t cali_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t cali_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	struct aw963xx *aw963xx = container_of(class, struct aw963xx, capsense_class);
@@ -971,7 +971,7 @@ static ssize_t cali_show(struct class *class,
 static CLASS_ATTR_RO(cali);
 
 static ssize_t
-reset_store(struct class *class, struct class_attribute *attr, const char *buf, size_t count)
+reset_store(const struct class *class, const struct class_attribute *attr, const char *buf, size_t count)
 {
 	u32 temp = 0;
 	struct aw963xx *aw963xx = container_of(class, struct aw963xx, capsense_class);
@@ -997,8 +997,8 @@ reset_store(struct class *class, struct class_attribute *attr, const char *buf, 
 
 static CLASS_ATTR_WO(reset);
 
-static ssize_t mode_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t mode_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	struct aw963xx *aw963xx = container_of(class, struct aw963xx, capsense_class);
@@ -1024,8 +1024,8 @@ static ssize_t mode_show(struct class *class,
 }
 
 
-static ssize_t mode_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t mode_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	int8_t mode = 0;
@@ -1057,8 +1057,8 @@ static ssize_t mode_store(struct class *class,
 
 static CLASS_ATTR_RW(mode);
 
-static ssize_t reg_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t reg_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	u32 *p = (u32*)buf;
@@ -1083,8 +1083,8 @@ static ssize_t reg_show(struct class *class,
 	return -1;
 }
 
-static ssize_t reg_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t reg_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	uint16_t regaddr = 0;
@@ -1123,8 +1123,8 @@ static ssize_t reg_store(struct class *class,
 }
 static CLASS_ATTR_RW(reg);
 
-static ssize_t int_state_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t int_state_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	struct aw963xx *aw963xx = container_of(class, struct aw963xx, capsense_class);
@@ -1144,8 +1144,8 @@ static ssize_t int_state_show(struct class *class,
 }
 static CLASS_ATTR_RO(int_state);
 
-static ssize_t offset_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t offset_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	struct aw963xx *aw963xx = container_of(class, struct aw963xx, capsense_class);
@@ -1448,7 +1448,7 @@ void aw963xx_deinit(struct aw_sar *p_sar)
 
 	aw963xx = (struct aw963xx *)p_sar->priv_data;
 
-	del_timer_sync(&aw963xx->abnormal_irq_timer);
+	timer_delete_sync(&aw963xx->abnormal_irq_timer);
 
 	if (p_sar->priv_data != NULL) {
 		devm_kfree(p_sar->dev, p_sar->priv_data);

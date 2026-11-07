@@ -6,6 +6,9 @@ obj-m += drivers/mmi_info/
 obj-m += drivers/sensors/
 obj-m += drivers/input/touchscreen/chipone_tddi_v2_mmi/
 obj-m += drivers/input/touchscreen/ilitek_v3_mmi/
+# The vendor_boot (recovery) set is above. The rest loads from vendor_dlkm
+# and is enabled with CONFIG_FOGOS_MOTO_DLKM (configs/fogos-make.config).
+ifneq ($(CONFIG_FOGOS_MOTO_DLKM),)
 obj-m += drivers/misc/utag/
 obj-m += drivers/power/mmi-smbcharger-iio/
 obj-m += drivers/power/qpnp_adaptive_charge/
@@ -22,3 +25,4 @@ obj-m += drivers/mmi_relay/
 obj-m += drivers/fm/
 # Camera sensor rails (fogos-wl286xx.dtsi); stock fogos (5.4) built it in.
 obj-m += drivers/regulator/wl2864c/
+endif

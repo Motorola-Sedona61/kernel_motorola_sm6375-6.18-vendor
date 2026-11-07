@@ -1954,7 +1954,7 @@ static int32_t aw_sar_regulator_power(struct aw_sar *p_sar)
  * @brief Drive logic entry
  *
  */
-static int32_t aw_sar_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+static int32_t aw_sar_i2c_probe(struct i2c_client *i2c)
 {
 	int32_t ret = 0;
 	struct aw_sar *p_sar = NULL;

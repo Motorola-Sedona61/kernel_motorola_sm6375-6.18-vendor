@@ -392,7 +392,7 @@ static int fpc1020_create_sysfs(struct fpc1020_data *fpc1020, bool create) {
 			goto ALLOC_REGION;
 		}
 		if (!fingerprint_class) {
-			fingerprint_class = class_create(THIS_MODULE, "fingerprint");
+			fingerprint_class = class_create("fingerprint");
 			if (IS_ERR(fingerprint_class)) {
 				dev_err(dev, "%s create fingerprint class failed.\n", __func__);
 				rc = PTR_ERR(fingerprint_class);
@@ -576,7 +576,7 @@ err_pwr:
 	return rc;
 }
 
-static int fpc1020_remove(struct platform_device *pdev)
+static void fpc1020_remove(struct platform_device *pdev)
 {
 	struct  fpc1020_data *fpc1020 = dev_get_drvdata(&pdev->dev);
 
@@ -613,7 +613,6 @@ static int fpc1020_remove(struct platform_device *pdev)
 		pr_info("remove pwr_gpio success\n");
 	}
 	dev_info(&pdev->dev, "%s\n", __func__);
-	return 0;
 }
 
 static int fpc1020_suspend(struct device *dev)

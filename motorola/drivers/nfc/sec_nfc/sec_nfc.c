@@ -1076,8 +1076,7 @@ typedef struct i2c_driver sec_nfc_driver_type;
 #define SEC_NFC_INIT(driver)    i2c_add_driver(driver)
 #define SEC_NFC_EXIT(driver)    i2c_del_driver(driver)
 
-static int sec_nfc_probe(struct i2c_client *client,
-                            const struct i2c_device_id *id)
+static int sec_nfc_probe(struct i2c_client *client)
 {
 	struct sec_nfc_info *info;
 	int ret = 0;
@@ -1120,9 +1119,9 @@ static int sec_nfc_probe(struct platform_device *pdev)
 	return __sec_nfc_probe(&pdev->dev);
 }
 
-static int sec_nfc_remove(struct platform_device *pdev)
+static void sec_nfc_remove(struct platform_device *pdev)
 {
-	return __sec_nfc_remove(&pdev->dev);
+	__sec_nfc_remove(&pdev->dev);
 }
 
 static struct platform_device_id sec_nfc_id_table[] = {

@@ -12,15 +12,17 @@ KERNEL_SRC ?= $(VENDOR_SRC)/../kernel
 KERNEL_OUT ?= $(KERNEL_SRC)
 VENDOR_OUT ?= $(VENDOR_SRC)/../out/vendor
 VENDOR_CONFIG ?= $(VENDOR_SRC)/configs/fogos.config
+VENDOR_MAKE_CONFIG ?= $(VENDOR_SRC)/configs/fogos-make.config
 
 autoconf := $(VENDOR_OUT)/include/generated/vendor_autoconf.h
 config_vars := $(shell sed -n 's/^\(CONFIG_[A-Za-z0-9_]*=.*\)$$/\1/p' $(VENDOR_CONFIG))
+make_vars := $(shell sed -n 's/^\(CONFIG_[A-Za-z0-9_]*=.*\)$$/\1/p' $(VENDOR_MAKE_CONFIG))
 
 vendor_includes := -I$(VENDOR_SRC)/include -I$(VENDOR_SRC)/include/uapi \
 	-include $(autoconf)
 
 kbuild := $(MAKE) -C $(KERNEL_SRC) O=$(KERNEL_OUT) M=$(VENDOR_SRC) \
-	MO=$(VENDOR_OUT) NOSTDINC_FLAGS="$(vendor_includes)" $(config_vars)
+	MO=$(VENDOR_OUT) NOSTDINC_FLAGS="$(vendor_includes)" $(config_vars) $(make_vars)
 
 modules: $(autoconf)
 	$(kbuild) modules

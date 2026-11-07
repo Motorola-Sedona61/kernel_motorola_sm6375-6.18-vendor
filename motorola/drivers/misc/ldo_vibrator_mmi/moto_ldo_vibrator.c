@@ -3,6 +3,7 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
+#include <linux/platform_device.h>
 #include <linux/errno.h>
 #include <linux/hrtimer.h>
 #include <linux/init.h>
@@ -347,7 +348,7 @@ fail:
 	return ret;
 }
 
-static int moto_vibrator_ldo_remove(struct platform_device *pdev)
+static void moto_vibrator_ldo_remove(struct platform_device *pdev)
 {
 	struct vib_ldo_chip *chip = dev_get_drvdata(&pdev->dev);
 
@@ -357,7 +358,6 @@ static int moto_vibrator_ldo_remove(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, NULL);
 	if (gpio_is_valid(chip->en_gpio) )
 		gpio_free(chip->en_gpio);
-	return 0;
 }
 
 static const struct of_device_id vibrator_ldo_match_table[] = {

@@ -45,3 +45,4 @@ obj-y += drivers/power/supply/qcom/
 obj-y += drivers/usb/phy/
 obj-y += drivers/usb/pd/
 obj-y += drivers/usb/dwc3/
+obj-y += motorola/

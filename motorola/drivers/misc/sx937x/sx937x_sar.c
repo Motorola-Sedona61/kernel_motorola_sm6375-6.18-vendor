@@ -12,6 +12,7 @@
 
 #define MAX_WRITE_ARRAY_SIZE 32
 
+#include <linux/of.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
@@ -408,8 +409,8 @@ static void read_rawData(psx93XX_t this)
 	}
 }
 
-static ssize_t capsense_reset_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t capsense_reset_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	u32 temp = 0;
@@ -428,8 +429,8 @@ static ssize_t capsense_reset_store(struct class *class,
 }
 
 #ifdef CONFIG_CAPSENSE_HEADSET_STATE
-static ssize_t capsense_headset_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t capsense_headset_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	u32 reg_temp = 0;
@@ -474,8 +475,8 @@ static ssize_t capsense_headset_store(struct class *class,
 }
 #endif
 
-static ssize_t capsense_raw_data_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t capsense_raw_data_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	char *p = buf;
@@ -502,8 +503,8 @@ static ssize_t capsense_raw_data_show(struct class *class,
 	return (p-buf);
 }
 
-static ssize_t sx937x_register_write_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t sx937x_register_write_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	u32 reg_address = 0, val = 0;
@@ -523,8 +524,8 @@ static ssize_t sx937x_register_write_store(struct class *class,
 
 static int sx937x_temp_regist = 0;
 static u32 sx937x_temp_val = 0;
-static ssize_t sx937x_register_read_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t sx937x_register_read_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	int nirq_state = 0;
@@ -543,15 +544,15 @@ static ssize_t sx937x_register_read_store(struct class *class,
 	return count;
 }
 
-static ssize_t sx937x_register_read_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t sx937x_register_read_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	return sprintf(buf, "Register(0x%2x) data(0x%4x)\n", sx937x_temp_regist, sx937x_temp_val);
 }
 
-static ssize_t reg_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t reg_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	u32 *p = (u32*)buf;
@@ -581,8 +582,8 @@ static ssize_t reg_show(struct class *class,
 	0-real write,
 	1-just transfer the reg value want to be readed
 */
-static ssize_t reg_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t reg_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	psx93XX_t this = global_sx937x;
@@ -618,8 +619,8 @@ static ssize_t reg_store(struct class *class,
 	return count;
 }
 
-static ssize_t manual_offset_calibration_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t manual_offset_calibration_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	u32 reg_value = 0;
@@ -631,8 +632,8 @@ static ssize_t manual_offset_calibration_show(struct class *class,
 }
 
 
-static ssize_t manual_offset_calibration_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t manual_offset_calibration_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	unsigned long val;
@@ -650,8 +651,8 @@ static ssize_t manual_offset_calibration_store(struct class *class,
 	return count;
 }
 
-static ssize_t sx937x_int_state_show(struct class *class,
-		struct class_attribute *attr,
+static ssize_t sx937x_int_state_show(const struct class *class,
+		const struct class_attribute *attr,
 		char *buf)
 {
 	psx93XX_t this = global_sx937x;
@@ -659,8 +660,8 @@ static ssize_t sx937x_int_state_show(struct class *class,
 	return sprintf(buf, "%d\n", this->int_state);
 }
 
-static ssize_t sx937x_reinitialize_store(struct class *class,
-		struct class_attribute *attr,
+static ssize_t sx937x_reinitialize_store(const struct class *class,
+		const struct class_attribute *attr,
 		const char *buf, size_t count)
 {
 	psx93XX_t this = global_sx937x;
@@ -724,7 +725,6 @@ static struct class_attribute capsense_class_attributes[] = {
 
 struct class capsense_class = {
 	.name                   = "capsense",
-	.owner                  = THIS_MODULE,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
 	.class_groups           = capsense_class_groups,
 #else
@@ -953,7 +953,7 @@ const char *get_dsi_display_name(void)
 		end = strpbrk(idx, " ");
 		idx = strpbrk(idx, "=");
 		if (idx && end > idx)
-			strlcpy(display, idx + 1, end - idx);
+			strscpy(display, idx + 1, end - idx);
 	}
 
 	return display;
@@ -1020,7 +1020,6 @@ static bool parse_flip_dt_params(struct sx937x_platform_data *pdata, struct devi
 static int sx937x_parse_dt(struct sx937x_platform_data *pdata, struct device *dev)
 {
 	struct device_node *dNode = dev->of_node;
-	enum of_gpio_flags flags;
 	int i, rc, support_panel_num;
 	const char *panel_name, *current_dsi;
 	const char *reg_group_name = "Semtech,reg-init";
@@ -1043,8 +1042,8 @@ static int sx937x_parse_dt(struct sx937x_platform_data *pdata, struct device *de
 			break;
 		case SX937X_POWER_SUPPLY_TYPE_EXTERNAL_LDO:
 			/* parse the gpio number for external LDO enable pin*/
-			pdata->eldo_gpio = of_get_named_gpio_flags(dNode,
-					"Semtech,eldo-gpio",0,&flags);
+			pdata->eldo_gpio = of_get_named_gpio(dNode,
+					"Semtech,eldo-gpio", 0);
 			LOG_INFO("used eLDO_gpio 0x%x \n", pdata->eldo_gpio);
 			break;
 		default:
@@ -1052,8 +1051,8 @@ static int sx937x_parse_dt(struct sx937x_platform_data *pdata, struct device *de
 			break;
 	}
 
-	pdata->irq_gpio= of_get_named_gpio_flags(dNode,
-			"Semtech,nirq-gpio", 0, &flags);
+	pdata->irq_gpio= of_get_named_gpio(dNode,
+			"Semtech,nirq-gpio", 0);
 	irq_gpio_num = pdata->irq_gpio;
 	if (pdata->irq_gpio < 0){
 		LOG_ERR("get irq_gpio error\n");
@@ -1433,13 +1432,13 @@ static int flip_notify_callback(struct notifier_block *self,
 
 static void sx937x_i2c_watchdog_work(struct work_struct *work);
 
-/*! \fn static int sx937x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+/*! \fn static int sx937x_probe(struct i2c_client *client)
  * \brief Probe function
  * \param client pointer to i2c_client
  * \param id pointer to i2c_device_id
  * \return Whether probe was successful
  */
-static int sx937x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int sx937x_probe(struct i2c_client *client)
 {
 	int i = 0;
 	int err = 0;
@@ -1599,8 +1598,10 @@ static int sx937x_probe(struct i2c_client *client, const struct i2c_device_id *i
 				return err;
 			}
 
-			/*restore sys/class/capsense label*/
-			kobject_uevent(&capsense_class.p->subsys.kobj, KOBJ_CHANGE);
+			/*
+			 * 6.1 sent a change uevent on the capsense class kobject
+			 * here; 6.18 keeps the class kobject private.
+			 */
 
 			/* Add Pointer to main platform data struct */
 			pDevice->hw = pplatData;
