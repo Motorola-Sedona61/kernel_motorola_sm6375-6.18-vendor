@@ -485,8 +485,8 @@ static struct page *alloc_largest_available(struct dynamic_page_pool **pools,
 
 static struct dma_buf *system_heap_allocate(struct dma_heap *heap,
 					       unsigned long len,
-					       unsigned long fd_flags,
-					       unsigned long heap_flags)
+					       u32 fd_flags,
+					       u64 heap_flags)
 {
 	struct qcom_secure_system_heap *sys_heap;
 	struct qcom_sg_buffer *buffer;
@@ -618,18 +618,6 @@ free_buffer:
 	return ERR_PTR(ret);
 }
 
-static long get_pool_size_bytes(struct dma_heap *heap)
-{
-	long total_size = 0;
-	int i;
-	struct qcom_secure_system_heap *sys_heap = dma_heap_get_drvdata(heap);
-
-	for (i = 0; i < NUM_ORDERS; i++)
-		total_size += dynamic_page_pool_total(sys_heap->pool_list[i], true);
-
-	return total_size << PAGE_SHIFT;
-}
-
 int qcom_secure_system_heap_freeze(void)
 {
 	struct qcom_secure_system_heap *sys_heap;
@@ -672,7 +660,6 @@ int qcom_secure_system_heap_restore(void)
 
 static const struct dma_heap_ops system_heap_ops = {
 	.allocate = system_heap_allocate,
-	.get_pool_size = get_pool_size_bytes,
 };
 
 static int create_prefetch_workqueue(void)
