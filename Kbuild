@@ -4,6 +4,11 @@
 # The 6.1 kernel these drivers come from did not build with
 # -Wmissing-prototypes; 6.18 enables it by default.
 subdir-ccflags-y += -Wno-missing-prototypes
+# 6.18 builds with -fstrict-flex-arrays=3, so with the UBSAN bounds trap any
+# trailing [0]/[1] array the 6.1 code uses as a flexible array would panic.
+# Build the vendor code as 6.1 did (the compiler default); kernel structures
+# keep their __counted_by checks.
+subdir-ccflags-y += -fstrict-flex-arrays=0
 
 obj-y += drivers/soc/qcom/
 obj-y += drivers/firmware/
