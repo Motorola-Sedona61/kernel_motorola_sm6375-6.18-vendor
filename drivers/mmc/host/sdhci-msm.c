@@ -30,7 +30,6 @@
 #include <linux/ipc_logging.h>
 #include <linux/pinctrl/qcom-pinctrl.h>
 
-#include <trace/hooks/mmc.h>
 #include "../core/mmc_ops.h"
 #include "../core/host.h"
 #include "../core/core.h"
@@ -4259,218 +4258,6 @@ static inline void sdhci_msm_get_of_property(struct platform_device *pdev,
 		host->quirks2 |= SDHCI_QUIRK2_BROKEN_64_BIT_DMA;
 }
 
-static int mmc_sleep_busy_cb(void *cb_data, bool *busy)
-{
-	struct mmc_host *host = cb_data;
-	*busy = host->ops->card_busy(host);
-	return 0;
-}
-static int mmc_sleepawake(struct mmc_host *host)
-{
-	struct mmc_command cmd = {};
-	struct mmc_card *card = host->card;
-	unsigned int timeout_ms = DIV_ROUND_UP(card->ext_csd.sa_timeout, 10000);
-	bool use_r1b_resp;
-	int err;
-
-	/* Re-tuning can't be done once the card is deselected */
-	mmc_retune_hold(host);
-
-	cmd.opcode = MMC_SLEEP_AWAKE;
-	cmd.arg = card->rca << 16;
-	use_r1b_resp = mmc_prepare_busy_cmd(host, &cmd, timeout_ms);
-
-	err = mmc_wait_for_cmd(host, &cmd, 0);
-	if (err)
-		goto out_release;
-
-	/*
-	 * If the host does not wait while the card signals busy, then we can
-	 * try to poll, but only if the host supports HW polling, as the
-	 * SEND_STATUS cmd is not allowed. If we can't poll, then we simply need
-	 * to wait the sleep/awake timeout.
-	 */
-	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY && use_r1b_resp) {
-		err = mmc_select_card(card);
-		goto out_release;
-	}
-
-	if (!host->ops->card_busy) {
-		mmc_delay(timeout_ms);
-		goto out_release;
-	}
-
-	err = __mmc_poll_for_busy(host, 0, timeout_ms, &mmc_sleep_busy_cb, host);
-
-out_release:
-	mmc_retune_release(host);
-	return err;
-}
-
-static int mmc_test_awake_ext_csd(struct mmc_host *mmc)
-{
-	int err;
-	u8 *ext_csd;
-	struct mmc_card *card = mmc->card;
-	struct sdhci_host *host = mmc_priv(mmc);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-
-	err = mmc_get_ext_csd(card, &ext_csd);
-	if (err) {
-		pr_err("%s: %s: mmc_get_ext_csd failed (%d)\n",
-			mmc_hostname(mmc), __func__, err);
-		return err;
-	}
-
-	/* only compare read/write fields that the sw changes */
-	pr_debug("%s: %s: type(cached:current) cmdq(%d:%d) cache_ctrl(%d:%d) bus_width (%d:%d) timing(%d:%d)\n",
-		mmc_hostname(mmc), __func__,
-		msm_host->raw_ext_csd_cmdq,
-		ext_csd[EXT_CSD_CMDQ_MODE_EN],
-		msm_host->raw_ext_csd_cache_ctrl,
-		ext_csd[EXT_CSD_CACHE_CTRL],
-		msm_host->raw_ext_csd_bus_width,
-		ext_csd[EXT_CSD_BUS_WIDTH],
-		msm_host->raw_ext_csd_hs_timing,
-		ext_csd[EXT_CSD_HS_TIMING]);
-
-	err = !((msm_host->raw_ext_csd_cmdq ==
-			ext_csd[EXT_CSD_CMDQ_MODE_EN]) &&
-		(msm_host->raw_ext_csd_cache_ctrl ==
-			ext_csd[EXT_CSD_CACHE_CTRL]) &&
-		(msm_host->raw_ext_csd_bus_width ==
-			ext_csd[EXT_CSD_BUS_WIDTH]) &&
-		(msm_host->raw_ext_csd_hs_timing ==
-			ext_csd[EXT_CSD_HS_TIMING]));
-
-	kfree(ext_csd);
-
-	return err;
-}
-static int mmc_cache_card_ext_csd(struct mmc_host *mmc)
-{
-	int err;
-	u8 *ext_csd;
-	struct mmc_card *card = mmc->card;
-	struct sdhci_host *host = mmc_priv(mmc);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-
-	err = mmc_get_ext_csd(card, &ext_csd);
-	if (err || !ext_csd) {
-		pr_err("%s: %s: mmc_get_ext_csd failed (%d)\n",
-			mmc_hostname(mmc), __func__, err);
-		return err;
-	}
-
-	/* only cache read/write fields that the sw changes */
-	msm_host->raw_ext_csd_cmdq = ext_csd[EXT_CSD_CMDQ_MODE_EN];
-	msm_host->raw_ext_csd_cache_ctrl = ext_csd[EXT_CSD_CACHE_CTRL];
-	msm_host->raw_ext_csd_bus_width = ext_csd[EXT_CSD_BUS_WIDTH];
-	msm_host->raw_ext_csd_hs_timing = ext_csd[EXT_CSD_HS_TIMING];
-
-	kfree(ext_csd);
-
-	return 0;
-}
-
-static int _mmc_partial_init(struct mmc_host *mmc)
-{
-	int err = 0;
-	struct mmc_card *card = mmc->card;
-	struct sdhci_host *host = mmc_priv(mmc);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-
-	mmc_set_bus_width(mmc, msm_host->cached_ios.bus_width);
-	mmc_set_timing(mmc, msm_host->cached_ios.timing);
-	if (msm_host->cached_ios.enhanced_strobe) {
-		mmc->ios.enhanced_strobe = true;
-		if (mmc->ops->hs400_enhanced_strobe)
-			mmc->ops->hs400_enhanced_strobe(mmc, &mmc->ios);
-	}
-	mmc_set_clock(mmc, msm_host->cached_ios.clock);
-	mmc_set_bus_mode(mmc, msm_host->cached_ios.bus_mode);
-
-	if (!mmc_card_hs400es(card) &&
-			(mmc_card_hs200(card) || mmc_card_hs400(card))) {
-		err = mmc_execute_tuning(card);
-		if (err) {
-			pr_err("%s: tuning execution failed: %d\n",
-				mmc_hostname(mmc), err);
-			goto out;
-		}
-	}
-
-	/*
-	 * The ext_csd is read to make sure the card did not went through
-	 * Power-failure during sleep period.
-	 * A subset of the W/E_P, W/C_P register will be tested. In case
-	 * these registers values are different from the values that were
-	 * cached during suspend, we will conclude that a Power-failure occurred
-	 * and will do full initialization sequence.
-	 */
-	err = mmc_test_awake_ext_csd(mmc);
-	if (err) {
-		pr_debug("%s: %s: fail on ext_csd read (%d)\n",
-			mmc_hostname(mmc), __func__, err);
-	}
-out:
-	return err;
-}
-
-static void mmc_cache_card(struct mmc_host *mmc)
-{
-
-	struct sdhci_host *host = mmc_priv(mmc);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-
-	memcpy(&msm_host->cached_ios, &mmc->ios, sizeof(msm_host->cached_ios));
-	mmc_cache_card_ext_csd(mmc);
-}
-
-static int mmc_can_sleep(struct mmc_card *card)
-{
-	return card->ext_csd.rev >= 3;
-}
-
-static int mmc_partial_init(struct mmc_host *mmc)
-{
-	int err = 0;
-
-	if (mmc_can_sleep(mmc->card)) {
-		err = mmc_sleepawake(mmc);
-		if (!err)
-			err = _mmc_partial_init(mmc);
-	}
-	return err;
-}
-
-static void sdhci_msm_mmc_suspend(void *unused, struct mmc_host *mmc)
-{
-	mmc_cache_card(mmc);
-
-#if IS_ENABLED(CONFIG_MMC_SDHCI_MSM_SCALING)
-	sdhci_msm_disable_scaling(mmc);
-#endif
-}
-
-static void sdhci_msm_mmc_resume(void *unused, struct mmc_host *mmc, bool *resume_success)
-{
-	int err;
-
-	err = mmc_partial_init(mmc);
-	if (err)
-		*resume_success = false;
-	else
-		*resume_success = true;
-#if IS_ENABLED(CONFIG_MMC_SDHCI_MSM_SCALING)
-	sdhci_msm_cqe_scaling_resume(mmc);
-#endif
-}
-
 static void sdhci_msm_clkgate_bus_delayed_work(struct work_struct *work)
 {
 	struct sdhci_msm_host *msm_host = container_of(work,
@@ -5636,10 +5423,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	pm_runtime_mark_last_busy(&pdev->dev);
 	pm_runtime_put_autosuspend(&pdev->dev);
 
-	if (host->mmc->caps & MMC_CAP_NONREMOVABLE) {
-		register_trace_android_rvh_mmc_suspend(sdhci_msm_mmc_suspend, NULL);
-		register_trace_android_rvh_mmc_resume(sdhci_msm_mmc_resume, NULL);
-	}
 	msm_host->sdhci_msm_pm_notifier.notifier_call
 		= sdhci_msm_hibernation_notifier;
 	ret = register_pm_notifier(&msm_host->sdhci_msm_pm_notifier);
@@ -5670,7 +5453,6 @@ bus_clk_deinit:
 	if (!IS_ERR(msm_host->bus_clk))
 		clk_disable_unprepare(msm_host->bus_clk);
 pltfm_free:
-	sdhci_pltfm_free(pdev);
 	return ret;
 }
 
@@ -5733,7 +5515,6 @@ skip_removing_qos:
 		sdhci_msm_bus_get_and_set_vote(host, 0);
 		sdhci_msm_bus_unregister(&pdev->dev, msm_host);
 	}
-	sdhci_pltfm_free(pdev);
 }
 
 static __maybe_unused int sdhci_msm_runtime_suspend(struct device *dev)
