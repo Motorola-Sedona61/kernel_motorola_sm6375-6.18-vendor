@@ -357,10 +357,26 @@ static int msm_mpm_gpio_chip_select(struct irq_domain *d,
 	return (bus_token == DOMAIN_BUS_WAKEUP);
 }
 
+/*
+ * irq_find_matching_fwspec() no longer calls .select for DOMAIN_BUS_ANY
+ * lookups (c0ece6449799, 6.12) and falls back to .match or a bare fwnode
+ * compare. This domain shares its fwnode with the MPM GIC domain and is
+ * ahead of it on the domain list, so it would take every <&mpm ...>
+ * interrupt, such as the SPMI arbiter's, and cut it off from the GIC.
+ * It is only for DOMAIN_BUS_WAKEUP lookups.
+ */
+static int msm_mpm_gpio_chip_match(struct irq_domain *d,
+				struct device_node *node,
+				enum irq_domain_bus_token bus_token)
+{
+	return (bus_token == DOMAIN_BUS_WAKEUP);
+}
+
 static const struct irq_domain_ops msm_mpm_gpio_chip_domain_ops = {
 	.alloc		= msm_mpm_gpio_chip_alloc,
 	.free		= irq_domain_free_irqs_common,
 	.select		= msm_mpm_gpio_chip_select,
+	.match		= msm_mpm_gpio_chip_match,
 };
 
 static int msm_mpm_gic_chip_translate(struct irq_domain *d,
