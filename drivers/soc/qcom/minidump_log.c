@@ -647,21 +647,6 @@ static void md_update_trace_fmt(void *unused, bool *format_check)
 	*format_check = false;
 }
 
-static void md_buf_size_check(void *unused, unsigned long buffer_size,
-			      bool *size_check)
-{
-	if (!minidump_ftrace_dump) {
-		*size_check = true;
-		return;
-	}
-
-	if (buffer_size > (SZ_256K + PAGE_SIZE)) {
-		pr_err("Skip md ftrace buffer dump for: %#lx\n", buffer_size);
-		minidump_ftrace_dump = false;
-		*size_check = true;
-	}
-}
-
 static void md_dump_trace_buf(void *unused, struct trace_seq *trace_buf,
 			      bool *printk_check)
 {
@@ -693,8 +678,6 @@ static void md_register_trace_buf(void)
 							 NULL);
 	register_trace_android_vh_ftrace_oops_exit(md_trace_oops_exit,
 							 NULL);
-	register_trace_android_vh_ftrace_size_check(md_buf_size_check,
-						    NULL);
 	register_trace_android_vh_ftrace_format_check(md_update_trace_fmt,
 						      NULL);
 	register_trace_android_vh_ftrace_dump_buffer(md_dump_trace_buf,
@@ -763,7 +746,7 @@ static void md_dump_cgroup_state(char *status, struct sched_entity *se_p,
 		md_dump_task_info(task, status, curr);
 		return;
 	}
-	nr_running = my_q->nr_running;
+	nr_running = my_q->nr_queued;
 	md_dump_align();
 	seq_buf_printf(md_runq_seq_buf, "%s: %d process is grouping\n",
 				   status, nr_running);
@@ -803,8 +786,6 @@ static void md_dump_cfs_rq(struct cfs_rq *cfs, struct task_struct *curr)
 
 	md_dump_cgroup_state("curr", cfs->curr, curr);
 	md_dump_cgroup_state("next", cfs->next, curr);
-	md_dump_cgroup_state("last", cfs->last, curr);
-	md_dump_cgroup_state("skip", cfs->skip, curr);
 	md_rb_walk_cfs(rb_root_cached_p, curr);
 }
 
@@ -908,7 +889,7 @@ static void md_dump_runqueues(void)
 			       cpu, rq->nr_running, cpu_curr(cpu)->pid);
 		seq_buf_printf(md_runq_seq_buf,
 			       "CFS has %d process\n",
-			       cfs->nr_running);
+			       cfs->nr_queued);
 		md_dump_cfs_rq(cfs, cpu_curr(cpu));
 		seq_buf_printf(md_runq_seq_buf,
 			       "RT has %d process\n",
@@ -1282,22 +1263,11 @@ static int register_vmap_mem(const char *name, void *virual_addr, size_t dump_le
 	return 0;
 }
 
-struct module_sect_attr {
-	struct bin_attribute battr;
-	unsigned long address;
-};
-
-struct module_sect_attrs {
-	struct attribute_group grp;
-	unsigned int nsections;
-	struct module_sect_attr attrs[];
-};
-
 static int md_module_process(struct module *mod)
 {
 	int i;
 	bool is_key_module = false;
-	unsigned long sec_addr, base_addr;
+	unsigned long base_addr;
 	unsigned long dump_start, dump_end;
 
 	for (i = 0; i < n_modump; i++) {
@@ -1306,23 +1276,17 @@ static int md_module_process(struct module *mod)
 	}
 
 	if (md_mod_info_seq_buf) {
-		base_addr = (unsigned long)mod->core_layout.base;
+		base_addr = (unsigned long)mod->mem[MOD_TEXT].base;
 		seq_buf_printf(md_mod_info_seq_buf, "name: %s, base: %lx",
 				mod->name, base_addr);
 		if (is_key_module) {
-			dump_start = base_addr +
-					mod->core_layout.ro_after_init_size;
-			dump_end = base_addr + mod->core_layout.size;
+			/* The writable data, as after ro_after_init in 6.1. */
+			dump_start = (unsigned long)mod->mem[MOD_DATA].base;
+			dump_end = dump_start + mod->mem[MOD_DATA].size;
 			if (((dump_end - dump_start) / PAGE_SIZE) <
 				msm_minidump_get_available_region()) {
-				for (i = 0; i < mod->sect_attrs->nsections ; i++) {
-					sec_addr = mod->sect_attrs->attrs[i].address;
-					if (sec_addr >= dump_start && sec_addr < dump_end) {
-						seq_buf_printf(md_mod_info_seq_buf, ", %s: %lx",
-							mod->sect_attrs->attrs[i].battr.attr.name,
-									sec_addr);
-					}
-				}
+				seq_buf_printf(md_mod_info_seq_buf, ", data: %lx",
+					       dump_start);
 				register_vmap_mem(mod->name, (void *)dump_start,
 						(dump_end - dump_start));
 			} else
