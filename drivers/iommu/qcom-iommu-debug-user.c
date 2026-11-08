@@ -165,7 +165,7 @@ static ssize_t iommu_debug_map_write(struct file *file, const char __user *ubuf,
 		return -EINVAL;
 	}
 
-	ret = iommu_map(ddev->domain, iova, phys, size, prot);
+	ret = iommu_map(ddev->domain, iova, phys, size, prot, GFP_KERNEL);
 	if (ret) {
 		pr_err_ratelimited("iommu_map failed with %d\n", ret);
 		retval = -EIO;
@@ -337,7 +337,7 @@ static ssize_t iommu_debug_dma_map_write(struct file *file,
 	else if (attr == 2)
 		dma_attrs = DMA_ATTR_FORCE_NON_COHERENT;
 	else if (attr == 3)
-		dma_attrs = DMA_ATTR_SYS_CACHE_ONLY;
+		dma_attrs = DMA_ATTR_SYS_CACHE;
 	else
 		goto invalid_format;
 
@@ -455,7 +455,7 @@ static ssize_t iommu_debug_dma_unmap_write(struct file *file, const char __user 
 	else if (attr == 2)
 		dma_attrs = DMA_ATTR_FORCE_NON_COHERENT;
 	else if (attr == 3)
-		dma_attrs = DMA_ATTR_SYS_CACHE_ONLY;
+		dma_attrs = DMA_ATTR_SYS_CACHE;
 	else
 		goto invalid_format;
 
@@ -730,7 +730,7 @@ out:
 	return ret;
 }
 
-static const char * const _size_to_string(unsigned long size)
+static const char * _size_to_string(unsigned long size)
 {
 	switch (size) {
 	case SZ_4K:
@@ -1321,7 +1321,7 @@ static void iommu_debug_device_profiling(struct seq_file *s, struct iommu_debug_
 			tbefore = ktime_get();
 			if (iommu_map(domain, __ALIGN_MASK(iova, align_mask),
 				      ALIGN(paddr, size), size,
-				      IOMMU_READ | IOMMU_WRITE)) {
+				      IOMMU_READ | IOMMU_WRITE, GFP_KERNEL)) {
 				seq_puts(s, "Failed to map\n");
 				continue;
 			}

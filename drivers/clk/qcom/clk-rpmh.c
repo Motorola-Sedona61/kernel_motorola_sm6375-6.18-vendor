@@ -15,7 +15,7 @@
 #include <soc/qcom/rpmh.h>
 #include <soc/qcom/tcs.h>
 
-#include <dt-bindings/clock/qcom,rpmh.h>
+#include "../../../include/dt-bindings/clock/qcom,rpmh.h"
 
 #define CLK_RPMH_ARC_EN_OFFSET		0
 #define CLK_RPMH_VRM_EN_OFFSET		4

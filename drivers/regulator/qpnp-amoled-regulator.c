@@ -923,9 +923,8 @@ error:
 	return rc;
 }
 
-static int qpnp_amoled_regulator_remove(struct platform_device *pdev)
+static void qpnp_amoled_regulator_remove(struct platform_device *pdev)
 {
-	return 0;
 }
 
 static const struct of_device_id amoled_match_table[] = {

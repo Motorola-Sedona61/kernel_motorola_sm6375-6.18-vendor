@@ -52,3 +52,29 @@ obj-y += drivers/usb/pd/
 obj-y += drivers/usb/dwc3/
 obj-y += motorola/
 obj-y += techpack/display/
+obj-y += drivers/char/
+obj-y += drivers/cpuidle/governors/
+obj-y += drivers/edac/
+obj-y += drivers/i3c/master/
+obj-y += drivers/interconnect/
+obj-y += drivers/leds/
+obj-y += drivers/soc/qcom/memshare/
+obj-y += drivers/soc/qcom/sps/
+obj-y += drivers/uio/msm_sharedmem/
+obj-y += drivers/usb/gadget/function/
+obj-y += kernel/
+obj-y += sound/usb/
+
+obj-y += techpack/graphics/
+
+obj-y += techpack/dsp/
+obj-y += techpack/securemsm/
+obj-y += techpack/bt/
+obj-y += techpack/mmrm/
+
+obj-y += techpack/audio/
+
+obj-y += techpack/wlan/
+
+obj-y += techpack/dataipa/ techpack/datarmnet/ techpack/datarmnet-ext/
+obj-y += techpack/camera/ techpack/video/

@@ -1166,7 +1166,7 @@ static CLASS_ATTR_RO(offset);
 static const char *g_aw963xx_ch_name[] = {
 	"Moto CapSense Ch0", "Moto CapSense Ch1", "Moto CapSense Ch2",
 	"Moto CapSense Ch3", "Moto CapSense Ch4", "Moto CapSensor Ch5",
-	"Moto CapSense Ch6", "Moto CapSense Ch7", "Moto CapSense Ch8"
+	"Moto CapSense Ch6", "Moto CapSense Ch7", "Moto CapSense Ch8",
 	"Moto CapSensor Ch9", "Moto CapSensor Ch10", "Moto CapSensor Ch11",
 	"Moto CapSensor Ch12", "Moto CapSensor Ch13", "Moto CapSensor Ch14"
 };
@@ -1251,7 +1251,6 @@ static int32_t aw_sar_custom_flie_node_create(void *data)
 	AWLOGD(p_sar->dev, "aw_sar_custom_flie_node");
 
 	aw963xx->capsense_class.name = "capsense";
-	aw963xx->capsense_class.owner = THIS_MODULE;
 
 	ret = class_register(&aw963xx->capsense_class);
 	if (ret < 0) {

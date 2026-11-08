@@ -77,9 +77,8 @@ static int logbuf_vh_driver_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int logbuf_vh_driver_remove(struct platform_device *pdev)
+static void logbuf_vh_driver_remove(struct platform_device *pdev)
 {
-	return 0;
 }
 
 static const struct of_device_id logbuf_vh_of_match[] = {

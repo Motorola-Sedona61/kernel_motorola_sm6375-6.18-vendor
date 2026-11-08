@@ -296,8 +296,8 @@ static int moto_vibrator_ldo_probe(struct platform_device *pdev)
 	mutex_init(&chip->lock);
 	INIT_WORK(&chip->vib_work, moto_vib_work);
 
-	hrtimer_init(&chip->stop_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	chip->stop_timer.function = vib_stop_timer;
+	hrtimer_setup(&chip->stop_timer, vib_stop_timer, CLOCK_MONOTONIC,
+		      HRTIMER_MODE_REL);
 	dev_set_drvdata(&pdev->dev, chip);
 
 	chip->cdev.name = "vibrator";

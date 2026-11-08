@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/soc/qcom/sps
+
+obj-$(CONFIG_SPS) += sps_drv.o
+sps_drv-y := bam.o sps_bam.o sps.o sps_dma.o sps_map.o sps_mem.o sps_rm.o

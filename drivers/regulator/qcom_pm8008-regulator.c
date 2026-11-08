@@ -1090,7 +1090,7 @@ static int pm8008_chip_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int pm8008_chip_remove(struct platform_device *pdev)
+static void pm8008_chip_remove(struct platform_device *pdev)
 {
 	struct pm8008_chip *chip = platform_get_drvdata(pdev);
 	int rc;
@@ -1099,8 +1099,6 @@ static int pm8008_chip_remove(struct platform_device *pdev)
 				CHIP_ENABLE_BIT, 0);
 	if (rc  < 0)
 		pr_err("failed to disable chip rc=%d\n", rc);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP

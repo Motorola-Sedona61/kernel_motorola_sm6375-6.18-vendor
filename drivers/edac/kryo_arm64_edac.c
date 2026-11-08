@@ -563,7 +563,7 @@ out_mem:
 	return rc;
 }
 
-static int kryo_cpu_erp_remove(struct platform_device *pdev)
+static void kryo_cpu_erp_remove(struct platform_device *pdev)
 {
 	struct erp_drvdata *drv = dev_get_drvdata(&pdev->dev);
 	struct edac_device_ctl_info *edac_ctl = drv->edev_ctl;
@@ -577,8 +577,6 @@ static int kryo_cpu_erp_remove(struct platform_device *pdev)
 	cpu_pm_unregister_notifier(&(drv->nb_pm));
 	edac_device_del_device(edac_ctl->dev);
 	edac_device_free_ctl_info(edac_ctl);
-
-	return 0;
 }
 
 static const struct of_device_id kryo_cpu_erp_match_table[] = {

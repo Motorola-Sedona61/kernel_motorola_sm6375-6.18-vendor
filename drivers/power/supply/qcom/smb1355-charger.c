@@ -938,7 +938,7 @@ static int smb1355_init_parallel_psy(struct smb1355 *chip)
 	struct power_supply_config parallel_cfg = {};
 
 	parallel_cfg.drv_data = chip;
-	parallel_cfg.of_node = chip->dev->of_node;
+	parallel_cfg.fwnode = dev_fwnode(chip->dev);
 
 	/* change to smb1355's property list */
 	parallel_psy_desc.properties = smb1355_parallel_props;
@@ -1148,7 +1148,7 @@ static int smb1355_init_iio_psy(struct smb1355 *chip)
 
 	indio_dev->info = &smb1355_iio_info;
 	indio_dev->dev.parent = chip->dev;
-	indio_dev->dev.of_node = chip->dev->of_node;
+	indio_dev->dev.fwnode = dev_fwnode(chip->dev);
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = chip->iio_chan;
 	indio_dev->num_channels = smb1355_num_iio_channels;
@@ -1777,10 +1777,9 @@ cleanup:
 	return rc;
 }
 
-static int smb1355_remove(struct platform_device *pdev)
+static void smb1355_remove(struct platform_device *pdev)
 {
 	platform_set_drvdata(pdev, NULL);
-	return 0;
 }
 
 static void smb1355_shutdown(struct platform_device *pdev)

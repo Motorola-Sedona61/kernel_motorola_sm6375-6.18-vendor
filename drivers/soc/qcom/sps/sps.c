@@ -2749,7 +2749,7 @@ static int msm_sps_probe(struct platform_device *pdev)
 	}
 
 	/* Create Device */
-	sps->dev_class = class_create(THIS_MODULE, SPS_DRV_NAME);
+	sps->dev_class = class_create(SPS_DRV_NAME);
 
 	ret = alloc_chrdev_region(&sps->dev_num, 0, 1, SPS_DRV_NAME);
 	if (ret) {
@@ -2867,7 +2867,7 @@ alloc_chrdev_region_err:
 	return ret;
 }
 
-static int msm_sps_remove(struct platform_device *pdev)
+static void msm_sps_remove(struct platform_device *pdev)
 {
 	SPS_DBG3(sps, "sps: Enter\n");
 
@@ -2880,8 +2880,6 @@ static int msm_sps_remove(struct platform_device *pdev)
 	if (!d_type)
 		clk_put(sps->pmem_clk);
 	clk_put(sps->bamdma_clk);
-
-	return 0;
 }
 
 static struct platform_driver msm_sps_driver = {

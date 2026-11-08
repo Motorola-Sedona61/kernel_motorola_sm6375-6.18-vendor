@@ -701,20 +701,24 @@ static int clk_debug_holi_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(debugcc_holi_hws); i++) {
+		const char *name = qcom_clk_hw_get_name(debugcc_holi_hws[i]);
+
 		clk = devm_clk_register(&pdev->dev, debugcc_holi_hws[i]);
 		if (IS_ERR(clk)) {
 			dev_err(&pdev->dev, "Unable to register %s, err:(%ld)\n",
-				clk_hw_get_name(debugcc_holi_hws[i]),
+				name,
 				PTR_ERR(clk));
 			return PTR_ERR(clk);
 		}
 	}
 
 	for (i = 0; i < ARRAY_SIZE(mux_list); i++) {
+		const char *name = qcom_clk_hw_get_name(&mux_list[i].mux->hw);
+
 		ret = devm_clk_register_debug_mux(&pdev->dev, mux_list[i].mux);
 		if (ret) {
 			dev_err(&pdev->dev, "Unable to register mux clk %s, err:(%d)\n",
-				qcom_clk_hw_get_name(&mux_list[i].mux->hw),
+				name,
 				ret);
 			return ret;
 		}

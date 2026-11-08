@@ -1,0 +1,17 @@
+ifeq ($(ANDROID_BUILD_TOP),)
+ANDROID_BUILD_TOP := $(srctree)/..
+endif
+
+# add -Wall to try to catch everything we can.
+ccflags-y += -Wall
+ccflags-y += -I$(srcroot)/motorola/include
+ccflags-y += -I$(srctree)
+ccflags-y += -I$(src)
+
+
+obj-m += moto_binder.o
+
+moto_binder-y := moto_binder_status.o moto_binder_sysfs.o moto_binder_main.o moto_binder_netfilter.o
+
+
+ccflags-y += -Wno-error=format -Wno-error=missing-prototypes

@@ -58,7 +58,7 @@ void sysstats_unregister_kgsl_stats_cb(void)
 }
 EXPORT_SYMBOL(sysstats_unregister_kgsl_stats_cb);
 
-static int sysstats_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
+static int sysstats_pre_doit(const struct genl_split_ops *ops, struct sk_buff *skb,
 			      struct genl_info *info)
 {
 	const struct nla_policy *policy = NULL;
@@ -691,5 +691,5 @@ static void __exit sysstats_exit(void)
 
 module_init(sysstats_init);
 module_exit(sysstats_exit);
-MODULE_IMPORT_NS(MINIDUMP);
+MODULE_IMPORT_NS("MINIDUMP");
 MODULE_LICENSE("GPL v2");

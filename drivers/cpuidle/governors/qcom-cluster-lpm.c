@@ -439,20 +439,18 @@ struct cluster_governor gov_ops = {
 	.disable = cluster_gov_disable,
 };
 
-static int lpm_cluster_gov_remove(struct platform_device *pdev)
+static void lpm_cluster_gov_remove(struct platform_device *pdev)
 {
 	struct generic_pm_domain *genpd = pd_to_genpd(pdev->dev.pm_domain);
 	struct lpm_cluster *cluster_gov = to_cluster(genpd);
 
 	if (!cluster_gov)
-		return -ENODEV;
+		return;
 
 	pm_runtime_disable(&pdev->dev);
 	cluster_gov->genpd->flags &= ~GENPD_FLAG_MIN_RESIDENCY;
 	remove_cluster_sysfs_nodes(cluster_gov);
 	dev_pm_genpd_remove_notifier(cluster_gov->dev);
-
-	return 0;
 }
 
 static int lpm_cluster_gov_probe(struct platform_device *pdev)
@@ -471,7 +469,7 @@ static int lpm_cluster_gov_probe(struct platform_device *pdev)
 	cluster_gov->dev = &pdev->dev;
 	cluster_gov->pred_wakeup = KTIME_MAX;
 	pm_runtime_enable(&pdev->dev);
-	hrtimer_init(&cluster_gov->histtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrtimer_setup(&cluster_gov->histtimer, clusttimer_fn, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	cluster_gov->genpd = pd_to_genpd(cluster_gov->dev->pm_domain);
 	cluster_gov->genpd_nb.notifier_call = cluster_power_cb;
 	cluster_gov->genpd->flags |= GENPD_FLAG_MIN_RESIDENCY;

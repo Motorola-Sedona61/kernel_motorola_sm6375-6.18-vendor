@@ -1,0 +1,7 @@
+subdir-ccflags-y += -DCONFIG_IPA3_MODULE=1 -ferror-limit=0
+# SPDX-License-Identifier: GPL-2.0-only
+subdir-ccflags-y += -I$(src)/../dataipa/drivers/platform/msm/include
+subdir-ccflags-y += -I$(src)/../dataipa/drivers/platform/msm/include/uapi
+subdir-ccflags-y += -I$(src)/../datarmnet-ext/mem -DCONFIG_RMNET_LA_PLATFORM=1
+subdir-ccflags-y += -DRMNET_TRACE_INCLUDE_PATH=$(src)/core -Wno-error=format
+obj-y += core/

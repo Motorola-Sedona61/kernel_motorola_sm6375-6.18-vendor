@@ -550,8 +550,7 @@ free_err:
 	return rc;
 }
 
-static int aw2016_led_probe(struct i2c_client *client,
-			    const struct i2c_device_id *id)
+static int aw2016_led_probe(struct i2c_client *client)
 {
 	struct aw2016_led *led_array;
 	struct device_node *node;

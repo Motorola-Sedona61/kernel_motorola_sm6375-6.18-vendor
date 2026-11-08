@@ -14,6 +14,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/cpu.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/string.h>

@@ -941,7 +941,7 @@ static int qcom_create_stats_device(struct stats_drvdata *drv)
 		return ret;
 	}
 
-	drv->stats_class = class_create(THIS_MODULE, STATS_DEVICE_NAME);
+	drv->stats_class = class_create(STATS_DEVICE_NAME);
 	if (IS_ERR_OR_NULL(drv->stats_class)) {
 		cdev_del(&drv->stats_cdev);
 		unregister_chrdev_region(drv->dev_no, 1);
@@ -1158,7 +1158,7 @@ fail_create_stats_device:
 	return ret;
 }
 
-static int qcom_stats_remove(struct platform_device *pdev)
+static void qcom_stats_remove(struct platform_device *pdev)
 {
 	struct stats_drvdata *drv = platform_get_drvdata(pdev);
 
@@ -1168,8 +1168,6 @@ static int qcom_stats_remove(struct platform_device *pdev)
 	unregister_chrdev_region(drv->dev_no, 1);
 
 	debugfs_remove_recursive(drv->root);
-
-	return 0;
 }
 
 static int qcom_stats_suspend(struct device *dev)

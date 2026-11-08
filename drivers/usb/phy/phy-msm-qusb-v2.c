@@ -1349,7 +1349,7 @@ static int qusb_phy_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int qusb_phy_remove(struct platform_device *pdev)
+static void qusb_phy_remove(struct platform_device *pdev)
 {
 	struct qusb_phy *qphy = platform_get_drvdata(pdev);
 
@@ -1357,8 +1357,6 @@ static int qusb_phy_remove(struct platform_device *pdev)
 	qphy->cable_connected = false;
 	qusb_phy_set_suspend(&qphy->phy, true);
 	debugfs_remove_recursive(qphy->root);
-
-	return 0;
 }
 
 static const struct of_device_id qusb_phy_id_table[] = {

@@ -6,6 +6,9 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
+#include <linux/mod_devicetable.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/errno.h>
 #include <linux/hrtimer.h>
 #include <linux/init.h>
@@ -360,7 +363,7 @@ static int qpnp_vibrator_ldo_probe(struct platform_device *pdev)
 	mutex_init(&chip->lock);
 	INIT_WORK(&chip->overdrive_work, qpnp_vib_overdrive_work);
 
-	hrtimer_init(&chip->overdrive_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrtimer_setup(&chip->overdrive_timer, vib_overdrive_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	chip->overdrive_timer.function = vib_overdrive_timer;
 	dev_set_drvdata(&pdev->dev, chip);
 
@@ -396,7 +399,7 @@ fail:
 	return ret;
 }
 
-static int qpnp_vibrator_ldo_remove(struct platform_device *pdev)
+static void qpnp_vibrator_ldo_remove(struct platform_device *pdev)
 {
 	struct vib_ldo_chip *chip = dev_get_drvdata(&pdev->dev);
 
@@ -406,8 +409,6 @@ static int qpnp_vibrator_ldo_remove(struct platform_device *pdev)
 	}
 	mutex_destroy(&chip->lock);
 	dev_set_drvdata(&pdev->dev, NULL);
-
-	return 0;
 }
 
 static const struct of_device_id vibrator_ldo_match_table[] = {

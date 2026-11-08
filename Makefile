@@ -25,20 +25,29 @@ kbuild := $(MAKE) -C $(KERNEL_SRC) O=$(KERNEL_OUT) M=$(VENDOR_SRC) \
 	MO=$(VENDOR_OUT) NOSTDINC_FLAGS="$(vendor_includes)" $(config_vars) $(make_vars) \
 	DISPLAY_ROOT=$(VENDOR_SRC)/techpack/display
 
-modules: $(autoconf)
-	$(kbuild) modules
+modules: $(autoconf) wlan-config
+	+$(kbuild) modules
 
-modules_install: $(autoconf)
-	$(kbuild) modules_install
+modules_install: $(autoconf) wlan-config
+	+$(kbuild) modules_install
 
 clean:
-	$(kbuild) clean
+	+$(kbuild) clean
 	rm -f $(autoconf)
 
-$(autoconf): $(VENDOR_CONFIG) $(VENDOR_SRC)/scripts/gen-autoconf.sh
+$(autoconf): $(VENDOR_CONFIG) $(VENDOR_SRC)/scripts/gen-autoconf.sh $(KERNEL_OUT)/.config
 	mkdir -p $(dir $@)
 	sh $(VENDOR_SRC)/scripts/gen-autoconf.sh $(VENDOR_CONFIG) \
 		$(KERNEL_OUT)/.config > $@.tmp
-	mv $@.tmp $@
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 
 .PHONY: modules modules_install clean
+
+# qcacld uses the same generated Kconfig defaults as its DDK build.
+wlan-config:
+	python3 $(VENDOR_SRC)/../tools/gen-qcacld-config.py \
+		--wlan-root $(VENDOR_SRC)/techpack/wlan/qcacld-3.0 \
+		--kernel $(KERNEL_SRC) --defconfig blair_gki_wlan_defconfig \
+		--out $(VENDOR_OUT)/include/generated/wlan \
+		--set FEATURE_BLACKLIST_MGR=n --set MPC_UT_FRAMEWORK=n
+.PHONY: wlan-config

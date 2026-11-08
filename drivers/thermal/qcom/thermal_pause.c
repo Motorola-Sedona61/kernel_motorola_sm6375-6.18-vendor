@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  */
-
 #define pr_fmt(fmt) "%s:%s " fmt, KBUILD_MODNAME, __func__
 
 #include <linux/module.h>
@@ -11,10 +10,10 @@
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/of_device.h>
+#include <linux/platform_device.h>
 #include <linux/suspend.h>
 #include <linux/cpumask.h>
 #include <linux/sched/walt.h>
-#include "thermal_zone_internal.h"
 
 enum thermal_pause_levels {
 	THERMAL_NO_CPU_PAUSE,
@@ -50,19 +49,19 @@ void thermal_pause_notifier_register(struct notifier_block *n)
 {
 	blocking_notifier_chain_register(&thermal_pause_notifier, n);
 }
-EXPORT_SYMBOL(thermal_pause_notifier_register);
+EXPORT_SYMBOL_GPL(thermal_pause_notifier_register);
 
 void thermal_pause_notifier_unregister(struct notifier_block *n)
 {
 	blocking_notifier_chain_unregister(&thermal_pause_notifier, n);
 }
-EXPORT_SYMBOL(thermal_pause_notifier_unregister);
+EXPORT_SYMBOL_GPL(thermal_pause_notifier_unregister);
 
 const struct cpumask *thermal_paused_cpumask(void)
 {
 	return &cpus_in_max_cooling_level;
 }
-EXPORT_SYMBOL(thermal_paused_cpumask);
+EXPORT_SYMBOL_GPL(thermal_paused_cpumask);
 
 static int thermal_pause_hp_online(unsigned int online_cpu)
 {
@@ -363,13 +362,6 @@ static int thermal_pause_probe(struct platform_device *pdev)
 	unsigned long mask = 0;
 	const char *alias;
 
-	/*
-	 * cpu pause is first thermal cooling device driver
-	 * which modeprobe in early boot up, hence just register
-	 * for vendor hook to disable cooling stats
-	 */
-	thermal_vendor_hooks_init();
-
 	INIT_LIST_HEAD(&thermal_pause_cdev_list);
 	cpumask_clear(&cpus_in_max_cooling_level);
 
@@ -429,12 +421,9 @@ static int thermal_pause_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int thermal_pause_remove(struct platform_device *pdev)
+static void thermal_pause_remove(struct platform_device *pdev)
 {
 	struct thermal_pause_cdev *thermal_pause_cdev = NULL, *next = NULL;
-	int ret = 0;
-
-	thermal_vendor_hooks_exit();
 
 	if (cpu_hp_online) {
 		cpuhp_remove_state_nocalls(cpu_hp_online);
@@ -458,11 +447,6 @@ static int thermal_pause_remove(struct platform_device *pdev)
 	}
 
 	mutex_unlock(&cpus_pause_lock);
-
-	/* if the resume failed, thermal still controls the CPUs.
-	 * ensure that the error is passed to the caller.
-	 */
-	return ret;
 }
 
 static const struct of_device_id thermal_pause_match[] = {

@@ -339,7 +339,6 @@ static int qmi_register_sensor_device(struct qmi_sensor *qmi_sens)
 		qmi_sens->tz_dev = NULL;
 		return ret;
 	}
-	qti_update_tz_ops(qmi_sens->tz_dev, true);
 
 	pr_debug("Sensor register success for %s\n", qmi_sens->qmi_name);
 
@@ -526,10 +525,8 @@ static void qmi_ts_cleanup(void)
 		list_for_each_entry_safe(qmi_sens, c_next,
 			&ts->ts_sensor_list, ts_node) {
 			qmi_sens->connection_active = false;
-			if (qmi_sens->tz_dev) {
-				qti_update_tz_ops(qmi_sens->tz_dev, false);
+			if (qmi_sens->tz_dev)
 				qmi_sens->tz_dev = NULL;
-			}
 			list_del(&qmi_sens->ts_node);
 		}
 		qmi_handle_release(&ts->handle);
@@ -683,12 +680,10 @@ probe_err:
 	return ret;
 }
 
-static int qmi_sens_device_remove(struct platform_device *pdev)
+static void qmi_sens_device_remove(struct platform_device *pdev)
 {
 	qmi_ts_cleanup();
 	unregister_pm_notifier(&qmi_sensor_pm_nb);
-
-	return 0;
 }
 
 static const struct of_device_id qmi_sens_device_match[] = {

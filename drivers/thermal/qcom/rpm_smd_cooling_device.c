@@ -121,7 +121,7 @@ static struct thermal_cooling_device_ops rpm_smd_device_ops = {
 	.set_cur_state = rpm_smd_set_cur_state,
 };
 
-static int rpm_smd_cdev_remove(struct platform_device *pdev)
+static void rpm_smd_cdev_remove(struct platform_device *pdev)
 {
 	struct rpm_smd_cdev *rpm_smd_dev =
 		(struct rpm_smd_cdev *)dev_get_drvdata(&pdev->dev);
@@ -134,8 +134,6 @@ static int rpm_smd_cdev_remove(struct platform_device *pdev)
 		rpm_smd_send_request_to_rpm(rpm_smd_dev, RPM_SMD_NORMAL);
 		msm_rpm_free_request(rpm_smd_dev->rpm_handle);
 	}
-
-	return 0;
 }
 
 static int rpm_smd_cdev_probe(struct platform_device *pdev)

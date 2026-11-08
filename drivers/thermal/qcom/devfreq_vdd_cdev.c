@@ -193,14 +193,12 @@ static int devfreq_vdd_cdev_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int devfreq_vdd_cdev_remove(struct platform_device *pdev)
+static void devfreq_vdd_cdev_remove(struct platform_device *pdev)
 {
 	struct devfreq_vdd_cdev *dfc =
 		(struct devfreq_vdd_cdev *)dev_get_drvdata(&pdev->dev);
 	if (dfc->cdev)
 		thermal_cooling_device_unregister(dfc->cdev);
-
-	return 0;
 };
 
 static const struct of_device_id devfreq_vdd_cdev_match[] = {

@@ -18,6 +18,7 @@
 #include <linux/workqueue.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include <linux/mmi_gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/timer.h>
 #include <linux/err.h>
@@ -31,9 +32,6 @@
 #include <linux/platform_device.h>
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 25))
-#define devm_gpio_free(a, b) NULL
-#endif
 
 int gf_parse_dts(struct gf_dev *gf_dev)
 {
@@ -75,7 +73,7 @@ int gf_parse_dts(struct gf_dev *gf_dev)
 		pr_warn("goodix: failed to get pwr gpio!\n");
 	} else {
 		if (gpio_is_valid(gf_dev->pwr_gpio)) {
-			rc = devm_gpio_request(dev, gf_dev->pwr_gpio, "goodix_pwr");
+			rc = mmi_devm_gpio_request(dev, gf_dev->pwr_gpio, "goodix_pwr");
 			if (rc) {
 				pr_err("goodix: failed to request pwr gpio, rc = %d\n", rc);
 				goto err_pwr;
@@ -90,7 +88,7 @@ int gf_parse_dts(struct gf_dev *gf_dev)
 		return gf_dev->reset_gpio;
 	}
 
-	rc = devm_gpio_request(dev, gf_dev->reset_gpio, "goodix_reset");
+	rc = mmi_devm_gpio_request(dev, gf_dev->reset_gpio, "goodix_reset");
 	if (rc) {
 		pr_err("goodix: failed to request reset gpio, rc = %d\n", rc);
 		goto err_reset;
@@ -103,7 +101,7 @@ int gf_parse_dts(struct gf_dev *gf_dev)
 		return gf_dev->irq_gpio;
 	}
 
-	rc = devm_gpio_request(dev, gf_dev->irq_gpio, "goodix_irq");
+	rc = mmi_devm_gpio_request(dev, gf_dev->irq_gpio, "goodix_irq");
 	if (rc) {
 		pr_err("goodix: failed to request irq gpio, rc = %d\n", rc);
 		goto err_irq;
@@ -112,13 +110,13 @@ int gf_parse_dts(struct gf_dev *gf_dev)
 	return rc;
 err_irq:
 	if (gpio_is_valid(gf_dev->reset_gpio)) {
-		devm_gpio_free(dev, gf_dev->reset_gpio);
+		mmi_devm_gpio_free(dev, gf_dev->reset_gpio);
 		gf_dev->reset_gpio = -1;
 	}
 err_reset:
 	gf_power_off(gf_dev);
 	if (gpio_is_valid(gf_dev->pwr_gpio)) {
-		devm_gpio_free(dev, gf_dev->pwr_gpio);
+		mmi_devm_gpio_free(dev, gf_dev->pwr_gpio);
 		gf_dev->pwr_gpio = -1;
 		pr_info("goodix: remove pwr_gpio success\n");
 	}
@@ -134,13 +132,11 @@ err_pwr:
 
 void gf_cleanup(struct gf_dev *gf_dev)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 25))
 	struct device *dev = &gf_dev->spi->dev;
-#endif
 	pr_info("goodix:  %s\n", __func__);
 
 	if (gpio_is_valid(gf_dev->irq_gpio)) {
-		devm_gpio_free(dev, gf_dev->irq_gpio);
+		mmi_devm_gpio_free(dev, gf_dev->irq_gpio);
 		gf_dev->irq_gpio = -1;
 		pr_info("goodix: remove irq_gpio success\n");
 	}
@@ -148,12 +144,12 @@ void gf_cleanup(struct gf_dev *gf_dev)
 		gf_power_off(gf_dev);
 	}
 	if (gpio_is_valid(gf_dev->pwr_gpio)) {
-		devm_gpio_free(dev, gf_dev->pwr_gpio);
+		mmi_devm_gpio_free(dev, gf_dev->pwr_gpio);
 		gf_dev->pwr_gpio = -1;
 		pr_info("goodix: remove pwr_gpio success\n");
 	}
 	if (gpio_is_valid(gf_dev->reset_gpio)) {
-		devm_gpio_free(dev, gf_dev->reset_gpio);
+		mmi_devm_gpio_free(dev, gf_dev->reset_gpio);
 		gf_dev->reset_gpio = -1;
 		pr_info("goodix: remove reset_gpio success\n");
 	}

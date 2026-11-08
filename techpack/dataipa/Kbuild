@@ -1,0 +1,36 @@
+subdir-ccflags-y += -Wno-error=unused-but-set-parameter
+subdir-ccflags-y += -DCONFIG_IPA3_MODULE=1 -ferror-limit=0
+# SPDX-License-Identifier: GPL-2.0-only
+export DATAIPA_ROOT := $(src)
+export RMNET_MEM_ROOT := $(src)/../datarmnet-ext/mem
+export CONFIG_GSI := m
+export CONFIG_IPA3 := m
+export CONFIG_IPA_CLIENTS_MANAGER := m
+export CONFIG_IPA_WDI_UNIFIED_API := y
+export CONFIG_RMNET_IPA3 := y
+export CONFIG_RNDIS_IPA := m
+export CONFIG_IPA3_REGDUMP := y
+export CONFIG_IPA3_REGDUMP_IPA_5_5 := y
+subdir-ccflags-y += -Wno-error=format -Wno-error=missing-prototypes
+DATAIPADRVTOP := $(DATAIPA_ROOT)/drivers/platform/msm
+
+subdir-ccflags-y += -include $(DATAIPA_ROOT)/config/dataipa_vendor.h \
+	-I$(DATAIPADRVTOP)/include \
+	-I$(DATAIPADRVTOP)/include/linux \
+	-I$(DATAIPADRVTOP)/include/uapi \
+	-I$(DATAIPADRVTOP)/gsi \
+	-I$(DATAIPADRVTOP)/gsi/gsihal \
+	-I$(DATAIPADRVTOP)/ipa \
+	-I$(DATAIPADRVTOP)/ipa/ipa_v3 \
+	-I$(DATAIPADRVTOP)/ipa/ipa_v3/ipahal \
+	-I$(DATAIPADRVTOP)/ipa/ipa_clients \
+	-I$(DATAIPADRVTOP)/ipa/ipa_v3/dump \
+	-I$(DATAIPADRVTOP)/ipa/ipa_v3/dump/ipa5.5 \
+	-I$(RMNET_MEM_ROOT)
+
+subdir-ccflags-y += -DCONFIG_IPA_RMNET_MEM=y \
+	-DGSI_TRACE_INCLUDE_PATH=$(DATAIPADRVTOP)/gsi \
+	-DIPA_TRACE_INCLUDE_PATH=$(DATAIPADRVTOP)/ipa/ipa_v3 \
+	-DRNDIS_TRACE_INCLUDE_PATH=$(DATAIPADRVTOP)/ipa/ipa_clients
+
+obj-y += drivers/platform/msm/gsi/ drivers/platform/msm/ipa/

@@ -1,0 +1,7 @@
+# add -Wall to try to catch everything we can.
+ccflags-y += -Wall
+
+obj-m += con_dfpar.o
+
+
+ccflags-y += -Wno-error=format -Wno-error=missing-prototypes

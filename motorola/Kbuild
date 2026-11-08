@@ -26,3 +26,11 @@ obj-m += drivers/fm/
 # Camera sensor rails (fogos-wl286xx.dtsi); stock fogos (5.4) built it in.
 obj-m += drivers/regulator/wl2864c/
 endif
+
+# Android vendor service helpers and factory CCI interface.
+obj-m += drivers/moto_binder/
+obj-m += drivers/moto_mmap_fault/
+obj-m += drivers/power/wakeup_sources/
+obj-m += drivers/moto_f_usbnet/
+obj-m += drivers/moto_netopt/con_dfpar/
+obj-m += drivers/media/platform/msm/camera/cam_sensor_module/cam_cci/

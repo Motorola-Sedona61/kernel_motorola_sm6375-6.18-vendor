@@ -1956,7 +1956,7 @@ geni_i3c_master_priv_xfers(struct i3c_dev_desc *dev, struct i3c_priv_xfer *xfers
  *
  * Return: 0 on success, error code on failure
  */
-static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, const struct i2c_msg *msgs, int num)
+static int geni_i3c_master_i2c_xfers(struct i2c_dev_desc *dev, struct i2c_msg *msgs, int num)
 {
 	struct i3c_master_controller *m = i2c_dev_get_master(dev);
 	struct geni_i3c_dev *gi3c = to_geni_i3c_master(m);
@@ -3546,7 +3546,7 @@ cleanup_init:
 	return ret;
 }
 
-static int geni_i3c_remove(struct platform_device *pdev)
+static void geni_i3c_remove(struct platform_device *pdev)
 {
 	struct geni_i3c_dev *gi3c = platform_get_drvdata(pdev);
 	int ret = 0, i;
@@ -3567,7 +3567,7 @@ static int geni_i3c_remove(struct platform_device *pdev)
 		I3C_LOG_DBG(gi3c->ipcl, false, gi3c->se.dev,
 			" i3c: pinctrl_select_state failed\n");
 
-	ret = i3c_master_unregister(&gi3c->ctrlr);
+	i3c_master_unregister(&gi3c->ctrlr);
 	/* TBD : If we need debug for previous session, Don't delete logs */
 	if (gi3c->ipcl)
 		ipc_log_context_destroy(gi3c->ipcl);
@@ -3575,8 +3575,6 @@ static int geni_i3c_remove(struct platform_device *pdev)
 	for (i = 0; i < i3c_nos; i++)
 		i3c_geni_dev[i] = NULL;
 	i3c_nos = 0;
-
-	return ret;
 }
 
 static int geni_i3c_resume_early(struct device *dev)

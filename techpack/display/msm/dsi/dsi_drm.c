@@ -1414,33 +1414,32 @@ struct dsi_bridge *dsi_drm_bridge_init(struct dsi_display *display,
 	int rc = 0;
 	struct dsi_bridge *bridge;
 
-	bridge = kzalloc(sizeof(*bridge), GFP_KERNEL);
-	if (!bridge) {
-		rc = -ENOMEM;
-		goto error;
-	}
+	bridge = devm_drm_bridge_alloc(&display->pdev->dev,
+				      struct dsi_bridge, base, &dsi_bridge_ops);
+	if (IS_ERR(bridge))
+		return bridge;
 
 	bridge->display = display;
-	bridge->base.funcs = &dsi_bridge_ops;
 	bridge->base.encoder = encoder;
 
 	rc = drm_bridge_attach(encoder, &bridge->base, NULL,
 				DRM_BRIDGE_ATTACH_NO_CONNECTOR);
 	if (rc) {
 		DSI_ERR("failed to attach bridge, rc=%d\n", rc);
-		goto error_free_bridge;
+		goto error;
 	}
 
 	return bridge;
-error_free_bridge:
-	kfree(bridge);
 error:
 	return ERR_PTR(rc);
 }
 
 void dsi_drm_bridge_cleanup(struct dsi_bridge *bridge)
 {
-	kfree(bridge);
+	/*
+	 * The display device owns the allocation. Encoder teardown drops
+	 * the attachment reference before devres releases the bridge.
+	 */
 }
 
 static bool is_valid_poms_switch(struct dsi_display_mode *mode_a,

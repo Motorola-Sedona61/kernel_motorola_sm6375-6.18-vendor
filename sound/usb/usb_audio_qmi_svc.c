@@ -24,7 +24,6 @@
 #include <linux/platform_device.h>
 #include <linux/usb/audio-v3.h>
 #include <linux/ipc_logging.h>
-#include <trace/hooks/audio_usboffload.h>
 
 #include "usbaudio.h"
 #include "card.h"
@@ -203,24 +202,6 @@ enum usb_qmi_audio_format {
 
 #define NUM_LOG_PAGES		10
 
-static int uaudio_snd_usb_pcm_change_state(struct snd_usb_substream *subs, int state)
-{
-	int ret;
-
-	if (!subs->str_pd)
-		return 0;
-
-	ret = snd_usb_power_domain_set(subs->stream->chip, subs->str_pd, state);
-	if (ret < 0) {
-		dev_err(&subs->dev->dev,
-			"Cannot change Power Domain ID: %d to state: %d. Err: %d\n",
-			subs->str_pd->pd_id, state, ret);
-		return ret;
-	}
-
-	return 0;
-}
-
 static void uaudio_iommu_unmap(enum mem_type mtype, unsigned long va,
 	size_t iova_size, size_t mapped_iova_size);
 
@@ -372,7 +353,7 @@ static unsigned long uaudio_iommu_map(enum mem_type mtype, bool dma_coherent,
 		sg_len = PAGE_ALIGN(sg->offset + sg->length);
 		pa_sg = page_to_phys(sg_page(sg));
 		ret = iommu_map(uaudio_qdev->domain, va_sg, pa_sg, sg_len,
-								prot);
+								prot, GFP_KERNEL);
 		if (ret) {
 			uaudio_err("mapping failed ret%d\n", ret);
 			uaudio_err("type:%d, pa:%pa iova:0x%08lx sg_len:%zu\n",
@@ -399,7 +380,7 @@ skip_sgt_map:
 	uaudio_dbg("type:%d map pa:%pa to iova:0x%08lx size:%zu\n", mtype, &pa,
 			va, size);
 
-	ret = iommu_map(uaudio_qdev->domain, va, pa, size, prot);
+	ret = iommu_map(uaudio_qdev->domain, va, pa, size, prot, GFP_KERNEL);
 	if (ret)
 		uaudio_err("failed to map pa:%pa iova:0x%lx type:%d ret:%d\n",
 				&pa, va, mtype, ret);
@@ -938,11 +919,9 @@ static void uaudio_dev_cleanup(struct uaudio_dev *dev)
 }
 
 
-static void uaudio_connect(void *unused, struct usb_interface *intf,
-		struct snd_usb_audio *chip)
+static void uaudio_connect(struct snd_usb_audio *chip)
 {
-	uaudio_dbg("intf: %s: %p chip: %p card_number:%d\n",
-		dev_name(&intf->dev), intf, chip, chip->card->number);
+	uaudio_dbg("chip: %p card_number:%d\n", chip, chip->card->number);
 
 	if (chip->card->number >= SNDRV_CARDS) {
 		uaudio_err("Invalid card number\n");
@@ -952,10 +931,9 @@ static void uaudio_connect(void *unused, struct usb_interface *intf,
 	uadev[chip->card->number].chip = chip;
 }
 
-static void uaudio_disconnect(void *unused, struct usb_interface *intf)
+static void uaudio_disconnect(struct snd_usb_audio *chip)
 {
 	int ret;
-	struct snd_usb_audio *chip = usb_get_intfdata(intf);
 	struct uaudio_dev *dev;
 	int card_num;
 	struct uaudio_qmi_svc *svc = uaudio_svc;
@@ -967,8 +945,7 @@ static void uaudio_disconnect(void *unused, struct usb_interface *intf)
 	}
 
 	card_num = chip->card->number;
-	uaudio_dbg("intf: %s: %p chip: %p card: %d\n", dev_name(&intf->dev),
-			intf, chip, card_num);
+	uaudio_dbg("chip: %p card: %d\n", chip, card_num);
 
 	if (card_num >= SNDRV_CARDS) {
 		uaudio_err("invalid card number\n");
@@ -1017,6 +994,11 @@ static void uaudio_disconnect(void *unused, struct usb_interface *intf)
 done:
 	uadev[card_num].chip = NULL;
 }
+
+static struct snd_usb_platform_ops uaudio_platform_ops = {
+	.connect_cb = uaudio_connect,
+	.disconnect_cb = uaudio_disconnect,
+};
 
 static void uaudio_dev_release(struct kref *kref)
 {
@@ -1167,107 +1149,6 @@ err:
 	return subs;
 }
 
-static const struct audioformat *
-find_format_and_si(struct list_head *fmt_list_head, snd_pcm_format_t format,
-	    unsigned int rate, unsigned int channels, unsigned int datainterval,
-	    struct snd_usb_substream *subs)
-{
-	const struct audioformat *fp;
-	const struct audioformat *found = NULL;
-	int cur_attr = 0, attr;
-
-	list_for_each_entry(fp, fmt_list_head, list) {
-		if (datainterval != -EINVAL && datainterval != fp->datainterval)
-			continue;
-		if (!(fp->formats & pcm_format_to_bits(format)))
-			continue;
-		if (fp->channels != channels)
-			continue;
-		if (rate < fp->rate_min || rate > fp->rate_max)
-			continue;
-		if (!(fp->rates & SNDRV_PCM_RATE_CONTINUOUS)) {
-			unsigned int i;
-
-			for (i = 0; i < fp->nr_rates; i++)
-				if (fp->rate_table[i] == rate)
-					break;
-			if (i >= fp->nr_rates)
-				continue;
-		}
-		attr = fp->ep_attr & USB_ENDPOINT_SYNCTYPE;
-		if (!found) {
-			found = fp;
-			cur_attr = attr;
-			continue;
-		}
-		/* avoid async out and adaptive in if the other method
-		 * supports the same format.
-		 * this is a workaround for the case like
-		 * M-audio audiophile USB.
-		 */
-		if (subs && attr != cur_attr) {
-			if ((attr == USB_ENDPOINT_SYNC_ASYNC &&
-			     subs->direction == SNDRV_PCM_STREAM_PLAYBACK) ||
-			    (attr == USB_ENDPOINT_SYNC_ADAPTIVE &&
-			     subs->direction == SNDRV_PCM_STREAM_CAPTURE))
-				continue;
-			if ((cur_attr == USB_ENDPOINT_SYNC_ASYNC &&
-			     subs->direction == SNDRV_PCM_STREAM_PLAYBACK) ||
-			    (cur_attr == USB_ENDPOINT_SYNC_ADAPTIVE &&
-			     subs->direction == SNDRV_PCM_STREAM_CAPTURE)) {
-				found = fp;
-				cur_attr = attr;
-				continue;
-			}
-		}
-		/* find the format with the largest max. packet size */
-		if (fp->maxpacksize > found->maxpacksize) {
-			found = fp;
-			cur_attr = attr;
-		}
-	}
-	return found;
-}
-
-static void close_endpoints(struct snd_usb_audio *chip,
-			    struct snd_usb_substream *subs)
-{
-	if (subs->data_endpoint) {
-		subs->data_endpoint->sync_source = NULL;
-		snd_usb_endpoint_close(chip, subs->data_endpoint);
-		subs->data_endpoint = NULL;
-	}
-
-	if (subs->sync_endpoint) {
-		snd_usb_endpoint_close(chip, subs->sync_endpoint);
-		subs->sync_endpoint = NULL;
-	}
-}
-
-static int configure_endpoints(struct snd_usb_audio *chip,
-			       struct snd_usb_substream *subs)
-{
-	int err;
-
-	if (subs->data_endpoint->need_setup) {
-		err = snd_usb_endpoint_prepare(chip, subs->data_endpoint);
-		if (err < 0) {
-			uaudio_err("failed to configure data endpoint\n");
-			return err;
-		}
-	}
-
-	if (subs->sync_endpoint) {
-		err = snd_usb_endpoint_prepare(chip, subs->sync_endpoint);
-		if (err < 0) {
-			uaudio_err("failed to configure endpoint\n");
-			return err;
-		}
-	}
-
-	return 0;
-}
-
 static int snd_interval_refine_set(struct snd_interval *i, unsigned int val)
 {
 	struct snd_interval t;
@@ -1332,132 +1213,61 @@ static int _snd_pcm_hw_param_set(struct snd_pcm_hw_params *params,
 	return changed;
 }
 
-bool _snd_usb_pcm_has_fixed_rate(struct snd_usb_substream *subs)
-{
-	const struct audioformat *fp;
-	struct snd_usb_audio *chip;
-	int rate = -1;
-
-	if (!subs)
-		return false;
-	chip = subs->stream->chip;
-	if (!(chip->quirk_flags & QUIRK_FLAG_FIXED_RATE))
-		return false;
-	list_for_each_entry(fp, &subs->fmt_list, list) {
-		if (fp->rates & SNDRV_PCM_RATE_CONTINUOUS)
-			return false;
-		if (fp->nr_rates < 1)
-			continue;
-		if (fp->nr_rates > 1)
-			return false;
-		if (rate < 0) {
-			rate = fp->rate_table[0];
-			continue;
-		}
-		if (rate != fp->rate_table[0])
-			return false;
-	}
-	return true;
-}
-
 static void disable_audio_stream(struct snd_usb_substream *subs)
 {
-	struct snd_usb_audio *chip = subs->stream->chip;
-
-	if (subs->data_endpoint || subs->sync_endpoint) {
-		close_endpoints(chip, subs);
-
-		mutex_lock(&chip->mutex);
-		subs->cur_audiofmt = NULL;
-		mutex_unlock(&chip->mutex);
-	}
-
-	snd_usb_autosuspend(chip);
+	snd_usb_hw_free(subs);
+	snd_usb_autosuspend(subs->stream->chip);
 }
 
 static int enable_audio_stream(struct snd_usb_substream *subs,
-				snd_pcm_format_t pcm_format,
-				unsigned int channels, unsigned int cur_rate,
-				int datainterval)
+			       snd_pcm_format_t pcm_format,
+			       unsigned int channels, unsigned int cur_rate,
+			       int datainterval)
 {
 	struct snd_usb_audio *chip = subs->stream->chip;
 	struct snd_pcm_hw_params params;
 	const struct audioformat *fmt;
 	int ret;
-	bool fixed_rate;
 
 	_snd_pcm_hw_params_any(&params);
-	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_FORMAT,
-			pcm_format, 0);
-	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_CHANNELS,
-			channels, 0);
-	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_RATE,
-			cur_rate, 0);
+	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_FORMAT, pcm_format, 0);
+	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_CHANNELS, channels, 0);
+	_snd_pcm_hw_param_set(&params, SNDRV_PCM_HW_PARAM_RATE, cur_rate, 0);
 
-	if (!chip->intf[0])
+	if (!chip->intf[0] || atomic_read(&chip->shutdown))
 		return -ENODEV;
+	/* Never silently substitute a service interval requested by the DSP. */
+	fmt = snd_usb_find_substream_format(subs, &params);
+	if (!fmt || (datainterval >= 0 && fmt->datainterval != datainterval))
+		return -EINVAL;
 
 	pm_runtime_barrier(&chip->intf[0]->dev);
-	snd_usb_autoresume(chip);
-
-	ret = uaudio_snd_usb_pcm_change_state(subs, UAC3_PD_STATE_D0);
+	ret = snd_usb_autoresume(chip);
 	if (ret < 0)
 		return ret;
 
-	fmt = find_format_and_si(&subs->fmt_list, pcm_format, cur_rate,
-			channels, datainterval, subs);
-	if (!fmt) {
-		dev_err(&subs->dev->dev, "cannot find format: format = %#x, rate = %d, channels = %d\n",
-			   pcm_format, cur_rate, channels);
-		return -EINVAL;
+	/* The core handles power domains, implicit feedback and endpoint refs. */
+	ret = snd_usb_hw_params(subs, &params);
+	if (ret < 0)
+		goto suspend;
+
+	ret = snd_usb_lock_shutdown(chip);
+	if (ret < 0)
+		goto free_endpoints;
+	if (subs->sync_endpoint) {
+		ret = snd_usb_endpoint_prepare(chip, subs->sync_endpoint);
+		if (ret < 0)
+			goto unlock;
 	}
-
-	if (atomic_read(&chip->shutdown)) {
-		uaudio_err("chip already shutdown\n");
-		ret = -ENODEV;
-	} else {
-		if (subs->data_endpoint)
-			close_endpoints(chip, subs);
-
-		fixed_rate = _snd_usb_pcm_has_fixed_rate(subs);
-		subs->data_endpoint = snd_usb_endpoint_open(chip, fmt,
-				&params, false, fixed_rate);
-		if (!subs->data_endpoint) {
-			uaudio_err("failed to open data endpoint\n");
-			return -EINVAL;
-		}
-
-		if (fmt->sync_ep) {
-			subs->sync_endpoint = snd_usb_endpoint_open(chip,
-					fmt, &params, false, fixed_rate);
-			if (!subs->sync_endpoint) {
-				uaudio_err("failed to open sync endpoint\n");
-				return -EINVAL;
-			}
-
-			subs->data_endpoint->sync_source = subs->sync_endpoint;
-		}
-
-		mutex_lock(&chip->mutex);
-		subs->cur_audiofmt = fmt;
-		mutex_unlock(&chip->mutex);
-
-		ret = configure_endpoints(chip, subs);
-		if (ret < 0) {
-			uaudio_err("%d:%d: usb_set_interface failed (%d)\n",
-					fmt->iface, fmt->altsetting, ret);
-			return ret;
-		}
-
-		uaudio_info("selected %s iface:%d altsetting:%d datainterval:%dus\n",
-				subs->direction ? "capture" : "playback",
-				fmt->iface, fmt->altsetting,
-				(1 << fmt->datainterval) *
-				(subs->dev->speed >= USB_SPEED_HIGH ?
-				 BUS_INTERVAL_HIGHSPEED_AND_ABOVE :
-				 BUS_INTERVAL_FULL_SPEED));
-	}
-
+	ret = snd_usb_endpoint_prepare(chip, subs->data_endpoint);
+unlock:
+	snd_usb_unlock_shutdown(chip);
+	if (!ret)
+		return 0;
+free_endpoints:
+	snd_usb_hw_free(subs);
+suspend:
+	snd_usb_autosuspend(chip);
 	return ret;
 }
 
@@ -1763,10 +1573,10 @@ static int uaudio_qmi_plat_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	uaudio_qdev->domain = iommu_domain_alloc(pdev->dev.bus);
-	if (!uaudio_qdev->domain) {
-		dev_err(&pdev->dev, "failed to allocate iommu domain\n");
-		return -ENODEV;
+	uaudio_qdev->domain = iommu_paging_domain_alloc(&pdev->dev);
+	if (IS_ERR(uaudio_qdev->domain)) {
+		return dev_err_probe(&pdev->dev, PTR_ERR(uaudio_qdev->domain),
+				     "failed to allocate iommu domain\n");
 	}
 
 	/* attach to external processor iommu */
@@ -1787,14 +1597,12 @@ static int uaudio_qmi_plat_probe(struct platform_device *pdev)
 	uaudio_qdev->xfer_buf_iova_size =
 		IOVA_XFER_BUF_MAX - IOVA_XFER_BUF_BASE;
 
-	ret = register_trace_android_vh_audio_usb_offload_connect(uaudio_connect, NULL);
+	ret = snd_usb_register_platform_ops(&uaudio_platform_ops);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to register connect callback ret = %d\n", ret);
+		dev_err(&pdev->dev, "failed to register platform callbacks: %d\n", ret);
 		goto detach_device;
 	}
-
-	ret = register_trace_android_rvh_audio_usb_offload_disconnect(uaudio_disconnect, NULL);
-		dev_err(&pdev->dev, "failed to register disconnect callback ret = %d\n", ret);
+	snd_usb_rediscover_devices();
 
 	return 0;
 
@@ -1805,14 +1613,12 @@ free_domain:
 	return ret;
 }
 
-static int uaudio_qmi_plat_remove(struct platform_device *pdev)
+static void uaudio_qmi_plat_remove(struct platform_device *pdev)
 {
-	unregister_trace_android_vh_audio_usb_offload_connect(uaudio_connect, NULL);
+	snd_usb_unregister_platform_ops();
 	iommu_detach_device(uaudio_qdev->domain, &pdev->dev);
 	iommu_domain_free(uaudio_qdev->domain);
 	uaudio_qdev->domain = NULL;
-
-	return 0;
 }
 
 static const struct of_device_id of_uaudio_matach[] = {

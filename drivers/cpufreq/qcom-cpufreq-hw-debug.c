@@ -6,6 +6,7 @@
 
 #define pr_fmt(fmt) "cpufreq_hw_debug: %s: " fmt, __func__
 
+#include <linux/platform_device.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/panic_notifier.h>
@@ -207,11 +208,10 @@ static int qcom_cpufreq_hw_debug_probe(struct platform_device *pdev)
 	return enable_cpufreq_hw_debug(pdev);
 }
 
-static int qcom_cpufreq_hw_debug_remove(struct platform_device *pdev)
+static void qcom_cpufreq_hw_debug_remove(struct platform_device *pdev)
 {
 	sysfs_remove_file(kernel_kobj, &cpufreq_hwregs_attr.attr);
 	kobject_put(cpufreqhw_kobj);
-	return 0;
 }
 
 static const struct of_device_id qcom_cpufreq_hw_debug_match[] = {

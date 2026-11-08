@@ -265,8 +265,9 @@ static void aw9610x_reg_version_comp(struct aw_sar *p_sar, struct aw_bin *aw_bin
 	}
 }
 
-static int32_t aw9610x_load_reg_bin(struct aw_bin *aw_bin, struct aw_sar *p_sar)
+static int32_t aw9610x_load_reg_bin(struct aw_bin *aw_bin, void *load_bin_para)
 {
+	struct aw_sar *p_sar = load_bin_para;
 	int32_t ret = 0;
 
 	struct aw9610x *aw9610x = (struct aw9610x *)p_sar->priv_data;
@@ -759,7 +760,7 @@ static const struct aw_sar_init_over_irq_t g_aw9610x_init_over_irq = {
 
 static const struct aw_sar_load_bin_t g_aw9610x_load_reg_bin = {
 	.bin_name = "aw9610x",
-	.bin_opera_func = (aw_sar_bin_opera_t)aw9610x_load_reg_bin,
+	.bin_opera_func = aw9610x_load_reg_bin,
 	.p_update_fn = NULL,
 };
 

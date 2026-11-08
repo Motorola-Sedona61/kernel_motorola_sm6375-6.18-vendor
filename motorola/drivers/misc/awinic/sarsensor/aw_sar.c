@@ -1,3 +1,4 @@
+#include <linux/pinctrl/consumer.h>
 #include "aw_sar_chip_interface.h"
 #include "aw_sar.h"
 

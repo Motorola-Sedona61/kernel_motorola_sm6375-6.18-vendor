@@ -6,3 +6,5 @@
 ccflags-y += -I$(src) -I$(srctree)/drivers/dma/qcom
 
 obj-$(CONFIG_MSM_GPI_DMA) += msm_gpi.o
+
+obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o

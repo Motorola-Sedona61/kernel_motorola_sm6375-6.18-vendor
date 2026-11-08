@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/sound/usb -I$(srctree)/drivers/usb/host
+
+obj-$(CONFIG_SND_USB_AUDIO_QMI) += snd-usb-audio-qmi.o
+snd-usb-audio-qmi-y := usb_audio_qmi_v01.o usb_audio_qmi_svc.o xhci-sec.o

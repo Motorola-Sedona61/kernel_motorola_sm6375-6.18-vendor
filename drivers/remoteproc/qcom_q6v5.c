@@ -124,7 +124,7 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 		"disabled and lead to device crash" :
 		"enabled and kick reovery process");
 	memset(qcom_ssr_reason, 0, sizeof(qcom_ssr_reason));
-	strlcpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
+	strscpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
 
 	if (q6v5->ssr_subdev)
 		qcom_notify_early_ssr_clients(q6v5->ssr_subdev);
@@ -157,7 +157,7 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	}
 
 	memset(qcom_ssr_reason, 0, sizeof(qcom_ssr_reason));
-	strlcpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
+	strscpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
 
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",

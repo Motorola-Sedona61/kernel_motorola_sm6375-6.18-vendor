@@ -24,7 +24,7 @@ static ssize_t cluster_idle_set(struct kobject *kobj,
 	bool disable;
 	int ret;
 
-	ret = strtobool(buf, &disable);
+	ret = kstrtobool(buf, &disable);
 	if (ret)
 		return -EINVAL;
 
@@ -205,9 +205,12 @@ void remove_global_sysfs_nodes(void)
 
 int create_global_sysfs_nodes(void)
 {
-	struct kobject *cpuidle_kobj = &cpu_subsys.dev_root->kobj;
+	struct device *cpu_root = bus_get_dev_root(&cpu_subsys);
 
-	qcom_lpm_kobj = kobject_create_and_add(KBUILD_MODNAME, cpuidle_kobj);
+	if (!cpu_root)
+		return -ENODEV;
+	qcom_lpm_kobj = kobject_create_and_add(KBUILD_MODNAME, &cpu_root->kobj);
+	put_device(cpu_root);
 	if (!qcom_lpm_kobj)
 		return -ENOMEM;
 

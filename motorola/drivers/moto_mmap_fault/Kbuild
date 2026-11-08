@@ -1,0 +1,7 @@
+# add -Wall to try to catch everything we can.
+ccflags-y += -Wall
+ccflags-y += -I$(srcroot)/motorola/include
+
+obj-m += moto_mmap_fault.o
+
+ccflags-y += -Wno-error=format -Wno-error=missing-prototypes

@@ -84,7 +84,7 @@ static int uevent_generate(struct mmi_sys_temp_dev *data, int index)
 	add_uevent_var(env, "TEMP=%d", data->sensor[index].temp);
 	add_uevent_var(env, "TRIP=%d", 0);
 
-	ret = kobject_uevent_env(&data->sensor[index].tz_dev->device.kobj, KOBJ_CHANGE, env->envp);
+	ret = kobject_uevent_env(&thermal_zone_device(data->sensor[index].tz_dev)->kobj, KOBJ_CHANGE, env->envp);
 
 	devm_kfree(&data->pdev->dev, env);
 
@@ -224,7 +224,7 @@ static struct miscdevice mmi_sys_temp_misc = {
 static int mmi_sys_temp_get(struct thermal_zone_device *thermal,
 			    int *temp)
 {
-	struct mmi_sys_temp_sensor *sensor = thermal->devdata;
+	struct mmi_sys_temp_sensor *sensor = thermal_zone_device_priv(thermal);
 
 	if (!sensor)
 		return -EINVAL;
@@ -350,11 +350,10 @@ static int mmi_sys_temp_probe(struct platform_device *pdev)
 
 		sys_temp_dev->sensor[i].temp = DEFAULT_TEMPERATURE;
 		sys_temp_dev->sensor[i].tz_dev =
-		   thermal_zone_device_register(sys_temp_dev->sensor[i].name,
-						0, 0,
+		   thermal_tripless_zone_device_register(sys_temp_dev->sensor[i].name,
 						&sys_temp_dev->sensor[i],
 						&mmi_sys_temp_ops,
-						NULL, 0, 0);
+						NULL);
 		if (IS_ERR(sys_temp_dev->sensor[i].tz_dev)) {
 			dev_err(&pdev->dev,
 				"thermal_zone_device_register() failed.\n");

@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+export MMRM_ROOT := $(src)
+export CONFIG_MSM_MMRM := y
+subdir-ccflags-y += -include $(src)/config/waipiommrmconf.h
+subdir-ccflags-y += -Wno-error=format
+obj-y += driver/

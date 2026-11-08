@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Retained APR/Q6 stack for the stock Fogos ADSP and current vendor HAL.
+include $(src)/config/holiauto.conf
+export AUDIO_ROOT := $(src)
+subdir-ccflags-y += -I$(src)/include -I$(src)/include/asoc
+subdir-ccflags-y += -I$(src)/include/uapi -I$(src)/include/uapi/audio
+subdir-ccflags-y += -include $(src)/config/holiautoconf.h
+export CONFIG_SND_SOC_FS1815=m
+subdir-ccflags-y += -DCONFIG_SND_SOC_FS1815=1
+export CONFIG_SND_SOC_AW87XXX=m
+export CONFIG_AW882XX_STEREO_SMARTPA=y
+export CONFIG_AW882XX_PARAMS_FROM_BIN=y
+export CONFIG_AW882XX_MAPSIZE_16K=y
+obj-y += soc/ dsp/ ipc/ asoc/

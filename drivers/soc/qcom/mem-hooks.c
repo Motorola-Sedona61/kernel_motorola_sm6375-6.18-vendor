@@ -2,133 +2,128 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *
+ * Took is_el1_instruction_abort() from arch/arm64/mm/fault.c
+ * Copyright (C) 2012 ARM Ltd
  */
 
 #include <linux/module.h>
-#include <linux/oom.h>
+#include <asm/esr.h>
+#include <asm/ptrace.h>
+#include <linux/cma.h>
+#include <linux/of.h>
+#include <linux/of_fdt.h>
+#include <linux/of_device.h>
+#include <linux/of_reserved_mem.h>
+
 #include <trace/hooks/mm.h>
-#include <trace/hooks/vmscan.h>
-#include <linux/printk.h>
-#include <linux/nodemask.h>
-#include <linux/kthread.h>
-#include <linux/swap.h>
+#include <trace/hooks/fault.h>
+#include "mm/cma.h"
 
-static uint kswapd_threads;
-module_param_named(kswapd_threads, kswapd_threads, uint, 0644);
-
-static void balance_reclaim(void *unused, bool *balance_anon_file_reclaim)
+static bool is_el1_instruction_abort(unsigned long esr)
 {
-	*balance_anon_file_reclaim = true;
+	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
 }
 
-static int kswapd_per_node_run(int nid, unsigned int kswapd_threads)
+static void can_fixup_sea(void *unused, unsigned long addr, unsigned long esr,
+			  struct pt_regs *regs, bool *can_fixup)
 {
-	pg_data_t *pgdat = NODE_DATA(nid);
-	unsigned int hid, start = 0;
-	int ret = 0;
-
-	if (pgdat->kswapd) {
-		start = 1;
-		pgdat->mkswapd[0] = pgdat->kswapd;
-	}
-
-	for (hid = start; hid < kswapd_threads; ++hid) {
-		pgdat->mkswapd[hid] = kthread_run(kswapd, pgdat, "kswapd%d:%d",
-								nid, hid);
-		if (IS_ERR(pgdat->mkswapd[hid])) {
-			/* failure at boot is fatal */
-			WARN_ON(system_state < SYSTEM_RUNNING);
-			pr_err("Failed to start kswapd%d on node %d\n",
-				hid, nid);
-			ret = PTR_ERR(pgdat->mkswapd[hid]);
-			pgdat->mkswapd[hid] = NULL;
-			continue;
-		}
-		if (!pgdat->kswapd)
-			pgdat->kswapd = pgdat->mkswapd[hid];
-	}
-	return ret;
-}
-
-static void kswapd_per_node_stop(int nid, unsigned int kswapd_threads)
-{
-	int hid = 0;
-	struct task_struct *kswapd;
-
-	for (hid = 0; hid < kswapd_threads; hid++) {
-		kswapd = NODE_DATA(nid)->mkswapd[hid];
-		if (kswapd) {
-			kthread_stop(kswapd);
-			NODE_DATA(nid)->mkswapd[hid] = NULL;
-		}
-	}
-	NODE_DATA(nid)->kswapd = NULL;
-}
-
-static void scan_abort_checks(void *data, bool *check_wmarks)
-{
-	*check_wmarks = true;
-}
-
-static void kswapd_threads_set(void *unused, int nid, bool *skip, bool run)
-{
-	*skip = true;
-	if (run)
-		kswapd_per_node_run(nid, kswapd_threads);
+	if (!user_mode(regs) && !is_el1_instruction_abort(esr))
+		*can_fixup = true;
 	else
-		kswapd_per_node_stop(nid, kswapd_threads);
-
+		*can_fixup = false;
 }
 
-static int init_kswapd_per_node_hook(void)
+static void bitmap_find_best_next_zero_area_off(void *data,
+						unsigned long *bitmap,
+						unsigned long bitmap_maxno,
+						unsigned long start,
+						unsigned int bitmap_count,
+						unsigned long mask,
+						unsigned long offset,
+						unsigned long *bitmap_no,
+						unsigned long best_fit)
 {
-	int ret = 0;
-	int nid;
+	if (!best_fit || !IS_ENABLED(CONFIG_CMA_BEST_FIT))
+		return;
 
-	if (kswapd_threads > MAX_KSWAPD_THREADS) {
-		pr_err("Failed to set kswapd_threads to %d ,Max limit is %d\n",
-				kswapd_threads, MAX_KSWAPD_THREADS);
-		return ret;
-	} else if (kswapd_threads > 1) {
-		ret = register_trace_android_vh_kswapd_per_node(kswapd_threads_set, NULL);
-		if (ret) {
-			pr_err("Failed to register kswapd_per_node hooks\n");
-			return ret;
+	unsigned long start_bit;
+	unsigned long bitmap_index;
+	unsigned long bitmap_len;
+	unsigned long next_bit;
+
+	start_bit = bitmap_maxno;
+	bitmap_len = bitmap_maxno + 1;
+	bitmap_index = bitmap_find_next_zero_area_off(bitmap,
+			bitmap_maxno, start, bitmap_count, mask,
+			offset);
+
+	while (bitmap_index < bitmap_maxno) {
+		next_bit = find_next_bit(bitmap, bitmap_maxno, bitmap_index + bitmap_count);
+		if ((next_bit - bitmap_index) < bitmap_len) {
+			bitmap_len = next_bit - bitmap_index;
+			start_bit = bitmap_index;
+			if (bitmap_len == bitmap_maxno)
+				goto end;
+			if (bitmap_len == bitmap_count) {
+				*bitmap_no = start_bit;
+				return;
+			}
 		}
-		for_each_node_state(nid, N_MEMORY)
-			kswapd_per_node_run(nid, kswapd_threads);
+		bitmap_index = bitmap_find_next_zero_area_off(bitmap,
+				bitmap_maxno, next_bit + 1, bitmap_count, mask, offset);
 	}
-	return ret;
+end:
+	*bitmap_no = start_bit;
+}
+
+#ifdef CONFIG_CMA_BEST_FIT
+static int cma_best_fit_setup(struct cma *cma, void *data)
+{
+	struct device_node *rmem_node, *rmem;
+
+	rmem_node = of_find_node_by_path("/reserved-memory");
+	if (!rmem_node) {
+		pr_err("Failed to find reserved-memory node\n");
+		return -ENODEV;
+	}
+
+	for_each_child_of_node(rmem_node, rmem) {
+		if (!strcmp(rmem->name, cma->name)) {
+			spin_lock_irq(&cma->lock);
+			cma->android_vendor_data1 =
+				(of_get_property(rmem, "cma-best-fit", NULL) ? true : false);
+			spin_unlock_irq(&cma->lock);
+		}
+	}
+
+	return 0;
+}
+#else
+static int cma_best_fit_setup(struct cma *cma, void *data)
+{
+	return 0;
+}
+#endif
+
+static void register_cma_hooks(void)
+{
+	register_trace_android_rvh_bitmap_find_best_next_area
+			(bitmap_find_best_next_zero_area_off, NULL);
+	cma_for_each_area(cma_best_fit_setup, NULL);
 }
 
 static int __init init_mem_hooks(void)
 {
 	int ret;
 
-	ret = init_kswapd_per_node_hook();
-	if (ret)
+	ret = register_trace_android_vh_try_fixup_sea(can_fixup_sea, NULL);
+	if (ret) {
+		pr_err("Failed to register try_fixup_sea\n");
 		return ret;
-
-	if (IS_ENABLED(CONFIG_QCOM_BALANCE_ANON_FILE_RECLAIM)) {
-		ret = register_trace_android_rvh_set_balance_anon_file_reclaim(
-							balance_reclaim,
-							NULL);
-		if (ret) {
-			pr_err("Failed to register balance_anon_file_reclaim hooks\n");
-			return ret;
-		}
 	}
-
-	if (IS_ENABLED(CONFIG_LRU_GEN)) {
-		ret = register_trace_android_vh_scan_abort_check_wmarks(
-							scan_abort_checks,
-							NULL);
-		if (ret) {
-			pr_err("Failed to register scan_abort_check_wmarks\n");
-			return ret;
-		}
-	}
+	register_cma_hooks();
 
 	return 0;
 }

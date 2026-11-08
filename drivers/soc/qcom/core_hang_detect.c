@@ -256,6 +256,7 @@ static int msm_hang_detect_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct hang_detect *hang_det = NULL;
+	struct device *cpu_root;
 	int ret, cluster_cpu_count = 0;
 	int cpu, num_cpu, entry, num_chd_entry;
 	const char *name;
@@ -332,9 +333,13 @@ static int msm_hang_detect_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	cpu_root = bus_get_dev_root(&cpu_subsys);
+	if (!cpu_root)
+		return -ENODEV;
 	ret = kobject_init_and_add(&hang_det->kobj, &core_ktype,
-			&cpu_subsys.dev_root->kobj, "%s_%s",
+			&cpu_root->kobj, "%s_%s",
 			"hang_detect", name);
+	put_device(cpu_root);
 	if (ret) {
 		pr_err("%s: Error in creation kobject_add\n", __func__);
 		goto out_put_kobj;
@@ -357,7 +362,7 @@ out_put_kobj:
 	return ret;
 }
 
-static int msm_hang_detect_remove(struct platform_device *pdev)
+static void msm_hang_detect_remove(struct platform_device *pdev)
 {
 	struct hang_detect *hang_det = platform_get_drvdata(pdev);
 
@@ -365,7 +370,6 @@ static int msm_hang_detect_remove(struct platform_device *pdev)
 	sysfs_remove_group(&hang_det->kobj, &hang_attr_group);
 	kobject_del(&hang_det->kobj);
 	kobject_put(&hang_det->kobj);
-	return 0;
 }
 
 static struct platform_driver msm_hang_detect_driver = {

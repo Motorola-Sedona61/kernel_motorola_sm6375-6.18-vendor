@@ -356,7 +356,6 @@ static const struct file_operations msm_rpm_master_stats_fops = {
 	.open	  = msm_rpm_master_stats_file_open,
 	.read	  = msm_rpm_master_stats_file_read,
 	.release  = msm_rpm_master_stats_file_close,
-	.llseek   = no_llseek,
 };
 
 static struct msm_rpm_master_stats_platform_data
@@ -448,14 +447,13 @@ static  int msm_rpm_master_stats_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int msm_rpm_master_stats_remove(struct platform_device *pdev)
+static void msm_rpm_master_stats_remove(struct platform_device *pdev)
 {
 	struct dentry *dent;
 
 	dent = platform_get_drvdata(pdev);
 	debugfs_remove(dent);
 	platform_set_drvdata(pdev, NULL);
-	return 0;
 }
 
 static const struct of_device_id rpm_master_table[] = {

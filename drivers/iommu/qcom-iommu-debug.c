@@ -6,6 +6,7 @@
 
 #define pr_fmt(fmt) "iommu-debug: %s: " fmt, __func__
 
+#include <linux/platform_device.h>
 #include <linux/bitfield.h>
 #include <linux/debugfs.h>
 #include <linux/iommu.h>
@@ -238,7 +239,6 @@ static const struct file_operations iommu_debug_usecase_fops = {
 	.open	 = simple_open,
 	.read	 = iommu_debug_usecase_read,
 	.write   = iommu_debug_usecase_write,
-	.llseek	 = no_llseek,
 };
 
 static int iommu_debug_debugfs_setup(struct iommu_debug_device *ddev)
@@ -315,7 +315,7 @@ out:
 	return ret;
 }
 
-static int iommu_debug_remove(struct platform_device *pdev)
+static void iommu_debug_remove(struct platform_device *pdev)
 {
 	struct iommu_debug_device *ddev = platform_get_drvdata(pdev);
 
@@ -324,7 +324,6 @@ static int iommu_debug_remove(struct platform_device *pdev)
 		of_platform_device_destroy(ddev->test_dev, NULL);
 
 	mutex_destroy(&ddev->state_lock);
-	return 0;
 }
 
 static const struct of_device_id iommu_debug_of_match[] = {

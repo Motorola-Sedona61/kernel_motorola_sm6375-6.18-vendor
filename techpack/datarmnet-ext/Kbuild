@@ -1,0 +1,9 @@
+subdir-ccflags-y += -Wno-misleading-indentation
+subdir-ccflags-y += -include net/rps.h -include net/netdev_rx_queue.h
+subdir-ccflags-y += -DCONFIG_IPA3_MODULE=1 -ferror-limit=0
+# SPDX-License-Identifier: GPL-2.0-only
+export RMNET_CORE_INC_DIR := $(src)/../datarmnet/core
+subdir-ccflags-y += -I$(src)/../dataipa/drivers/platform/msm/include
+subdir-ccflags-y += -I$(src)/../dataipa/drivers/platform/msm/include/uapi
+subdir-ccflags-y += -I$(src)/mem -DCONFIG_RMNET_LA_PLATFORM=1 -Wno-error=format
+obj-y += mem/ offload/ shs/ perf/ perf_tether/ wlan/

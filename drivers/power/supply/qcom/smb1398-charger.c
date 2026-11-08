@@ -1127,7 +1127,7 @@ static int smb1398_init_div2_cp_master_psy(struct smb1398_chip *chip)
 	int rc = 0;
 
 	div2_cp_master_psy_cfg.drv_data = chip;
-	div2_cp_master_psy_cfg.of_node = chip->dev->of_node;
+	div2_cp_master_psy_cfg.fwnode = dev_fwnode(chip->dev);
 
 	chip->div2_cp_master_psy = devm_power_supply_register(chip->dev,
 			&div2_cp_master_desc, &div2_cp_master_psy_cfg);
@@ -2228,7 +2228,7 @@ static int smb1398_init_div2_cp_slave_psy(struct smb1398_chip *chip)
 	struct power_supply_config cps_cfg = {};
 
 	cps_cfg.drv_data = chip;
-	cps_cfg.of_node = chip->dev->of_node;
+	cps_cfg.fwnode = dev_fwnode(chip->dev);
 
 	chip->div2_cp_slave_psy = devm_power_supply_register(chip->dev,
 			&div2_cps_psy_desc, &cps_cfg);
@@ -2525,7 +2525,7 @@ static int smb1398_create_pre_regulator_psy(struct smb1398_chip *chip)
 	int rc = 0;
 
 	pre_regulator_psy_cfg.drv_data = chip;
-	pre_regulator_psy_cfg.of_node = chip->dev->of_node;
+	pre_regulator_psy_cfg.fwnode = dev_fwnode(chip->dev);
 
 	chip->pre_regulator_psy = devm_power_supply_register(chip->dev,
 			&pre_regulator_psy_desc,
@@ -3055,7 +3055,7 @@ cleanup:
 	return rc;
 }
 
-static int smb1398_remove(struct platform_device *pdev)
+static void smb1398_remove(struct platform_device *pdev)
 {
 	struct smb1398_chip *chip = platform_get_drvdata(pdev);
 
@@ -3069,8 +3069,6 @@ static int smb1398_remove(struct platform_device *pdev)
 		mutex_destroy(&chip->die_chan_lock);
 		smb1398_destroy_votables(chip);
 	}
-
-	return 0;
 }
 
 static int smb1398_suspend(struct device *dev)

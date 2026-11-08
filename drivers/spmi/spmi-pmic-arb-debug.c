@@ -338,14 +338,12 @@ err_put_ctrl:
 	return rc;
 }
 
-static int spmi_pmic_arb_debug_remove(struct platform_device *pdev)
+static void spmi_pmic_arb_debug_remove(struct platform_device *pdev)
 {
 	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
 
 	spmi_controller_remove(ctrl);
 	spmi_controller_put(ctrl);
-
-	return 0;
 }
 
 static const struct of_device_id spmi_pmic_arb_debug_match_table[] = {

@@ -12,6 +12,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/mmi_gpio.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -29,9 +30,6 @@
 #define RESET_HIGH_SLEEP2_MIN_US 5000
 #define RESET_HIGH_SLEEP2_MAX_US (RESET_HIGH_SLEEP2_MIN_US + 100)
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 25))
-#define devm_gpio_free(a, b) NULL
-#endif
 
 struct FPS_data {
 	unsigned int enabled;
@@ -367,7 +365,7 @@ static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
 		dev_err(dev, "gpio %s is invalid\n", label);
 		return -EINVAL;
 	}
-	rc = devm_gpio_request(dev, *gpio, label);
+	rc = mmi_devm_gpio_request(dev, *gpio, label);
 	if (rc) {
 		dev_err(dev, "failed to request gpio %d\n", *gpio);
 		return rc;
@@ -458,7 +456,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 		fpc1020->pwr_gpio = -1;
 	} else {
 		if (gpio_is_valid(fpc1020->pwr_gpio)) {
-			rc = devm_gpio_request(dev, fpc1020->pwr_gpio, "fpc_pwr");
+			rc = mmi_devm_gpio_request(dev, fpc1020->pwr_gpio, "fpc_pwr");
 			if (rc) {
 				pr_err("failed to request pwr gpio, rc = %d\n", rc);
 				goto err_pwr;
@@ -569,7 +567,7 @@ err_pwr:
 	}
 
 	if (gpio_is_valid(fpc1020->pwr_gpio)) {
-		devm_gpio_free(fpc1020->dev,fpc1020->pwr_gpio);
+		mmi_devm_gpio_free(fpc1020->dev,fpc1020->pwr_gpio);
 		fpc1020->pwr_gpio = -1;
 		pr_info("remove pwr_gpio success\n");
 	}
@@ -593,11 +591,11 @@ static void fpc1020_remove(struct platform_device *pdev)
 		fpc1020_power_off(fpc1020);
 	}
 	if (gpio_is_valid(fpc1020->irq_gpio)) {
-		devm_gpio_free(fpc1020->dev, fpc1020->irq_gpio);
+		mmi_devm_gpio_free(fpc1020->dev, fpc1020->irq_gpio);
 		fpc1020->irq_gpio = -1;
 	}
 	if (gpio_is_valid(fpc1020->rst_gpio)) {
-		devm_gpio_free(fpc1020->dev, fpc1020->rst_gpio);
+		mmi_devm_gpio_free(fpc1020->dev, fpc1020->rst_gpio);
 		fpc1020->rst_gpio = -1;
 
 	}
@@ -608,7 +606,7 @@ static void fpc1020_remove(struct platform_device *pdev)
 		pr_info(" %s : regulator_put vdd \n", __func__);
 	}
 	if (gpio_is_valid(fpc1020->pwr_gpio)) {
-		devm_gpio_free(fpc1020->dev,fpc1020->pwr_gpio);
+		mmi_devm_gpio_free(fpc1020->dev,fpc1020->pwr_gpio);
 		fpc1020->pwr_gpio = -1;
 		pr_info("remove pwr_gpio success\n");
 	}

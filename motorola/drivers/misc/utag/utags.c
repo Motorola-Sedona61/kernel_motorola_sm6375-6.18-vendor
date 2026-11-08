@@ -462,19 +462,21 @@ static size_t data_size(struct blkdev *cb)
 static int open_utags(struct blkdev *cb)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(CONFIG_MMI_UTAG_RW_BIO)
-	struct block_device *bdev = NULL;
+	struct file *bdev_file;
 
-	bdev = blkdev_get_by_path(cb->name, FMODE_READ | FMODE_WRITE, cb);
-
-	if (IS_ERR(bdev)) {
+	if (cb->filep)
+		return 0;
+	bdev_file = bdev_file_open_by_path(cb->name,
+					 BLK_OPEN_READ | BLK_OPEN_WRITE, cb, NULL);
+	if (IS_ERR(bdev_file)) {
 		pr_err("(%s) failed get block device\n", cb->name);
-		return -EIO;
+		return PTR_ERR(bdev_file);
 	}
 
-	cb->bdev = bdev;
-	cb->size = i_size_read(bdev->bd_inode);
-	cb->filep = NULL;
-	pr_debug("%s: read inode size %lu\n", __func__, cb->size);
+	cb->filep = bdev_file;
+	cb->bdev = file_bdev(bdev_file);
+	cb->size = bdev_nr_bytes(cb->bdev);
+	pr_debug("%s: block device size %lu\n", __func__, cb->size);
 #else
 	struct inode *inode = NULL;
 

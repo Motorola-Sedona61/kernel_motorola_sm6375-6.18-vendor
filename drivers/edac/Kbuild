@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/edac
+
+obj-$(CONFIG_EDAC_KRYO_ARM64) += kryo_arm64_edac.o

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Objects as linked by the fogos 6.1 build.
+
+# This directory first, then the kernel subsystem's private headers,
+# as for an in-tree build.
+ccflags-y += -I$(src) -I$(srctree)/drivers/soc/qcom/memshare
+
+obj-$(CONFIG_MEM_SHARE_QMI_SERVICE) += heap_mem_ext_v01.o
+obj-$(CONFIG_MEM_SHARE_QMI_SERVICE) += msm_memshare.o
