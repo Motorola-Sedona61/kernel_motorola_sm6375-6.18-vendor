@@ -6,3 +6,5 @@
 ccflags-y += -I$(src) -I$(srctree)/kernel
 
 obj-$(CONFIG_MSM_SYSSTATS) += msm_sysstats.o
+
+obj-$(CONFIG_SCHED_WALT) += sched/walt/
