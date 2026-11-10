@@ -5257,6 +5257,15 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	ret = uart_add_one_port(drv, uport);
 	if (ret)
 		dev_err(&pdev->dev, "Failed to register uart_port: %d\n", ret);
+	else if (!is_console)
+		/*
+		 * This driver already supplies the physical UART idle delay.
+		 * The serial core's extra 500ms keeps its child active during
+		 * close, making our synchronous suspend return -EBUSY. Repeated
+		 * BT power pulses then overrun the controller init deadline.
+		 */
+		uart_port_set_pm_autosuspend_delay(uport, 0);
+
 
 	if (is_console)
 		pr_info("boot_kpi: M - DRIVER GENI_CONSOLE_%d Ready\n", line);
