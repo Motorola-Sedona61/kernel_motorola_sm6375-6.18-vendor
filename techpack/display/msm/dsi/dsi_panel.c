@@ -11,6 +11,7 @@
 #include <linux/of_gpio.h>
 #include <linux/pwm.h>
 #include <video/mipi_display.h>
+#include <linux/soc/qcom/panel_event_notifier.h>
 
 #if defined(CONFIG_PANEL_NOTIFICATIONS)
 #include <linux/panel_notifier.h>
@@ -488,7 +489,7 @@ static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable)
 	return rc;
 }
 
-#if defined(CONFIG_PANEL_NOTIFICATIONS)
+#if defined(CONFIG_PANEL_NOTIFICATIONS) || IS_ENABLED(CONFIG_QCOM_PANEL_EVENT_NOTIFIER)
 static bool panel_power_is_alway_on(struct dsi_panel *panel)
 {
 	int touch_state = 0;
