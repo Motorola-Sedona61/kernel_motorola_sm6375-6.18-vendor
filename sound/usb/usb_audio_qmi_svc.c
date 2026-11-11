@@ -1254,13 +1254,7 @@ static int enable_audio_stream(struct snd_usb_substream *subs,
 	ret = snd_usb_lock_shutdown(chip);
 	if (ret < 0)
 		goto free_endpoints;
-	if (subs->sync_endpoint) {
-		ret = snd_usb_endpoint_prepare(chip, subs->sync_endpoint);
-		if (ret < 0)
-			goto unlock;
-	}
-	ret = snd_usb_endpoint_prepare(chip, subs->data_endpoint);
-unlock:
+	ret = snd_usb_prepare_endpoints(subs);
 	snd_usb_unlock_shutdown(chip);
 	if (!ret)
 		return 0;
@@ -1277,13 +1271,13 @@ static int __handle_uaudio_stream_req(struct qmi_uaudio_stream_req_msg_v01 *req_
 	struct snd_usb_substream *subs;
 	struct snd_usb_audio *chip;
 	int ifnum;
-	u8 pcm_card_num, pcm_dev_num, direction;
+	unsigned int pcm_card_num, pcm_dev_num, direction;
 
 	direction = req_msg->usb_token & SND_PCM_STREAM_DIRECTION;
 	pcm_dev_num = (req_msg->usb_token & SND_PCM_DEV_NUM_MASK) >> 8;
 	pcm_card_num = (req_msg->usb_token & SND_PCM_CARD_NUM_MASK) >> 16;
 
-	uaudio_info("card#:%d dev#:%d dir:%d en:%d fmt:%d rate:%d #ch:%d\n",
+	uaudio_info("card#:%u dev#:%u dir:%u en:%d fmt:%d rate:%d #ch:%d\n",
 			pcm_card_num, pcm_dev_num, direction, req_msg->enable,
 			req_msg->audio_format, req_msg->bit_rate,
 			req_msg->number_of_ch);
@@ -1344,7 +1338,7 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 	ktime_t t_request_recvd = ktime_get();
 	struct snd_usb_audio *chip = NULL;
 
-	u8 pcm_card_num, pcm_dev_num, direction;
+	unsigned int pcm_card_num, pcm_dev_num, direction;
 	int info_idx = -EINVAL, datainterval = -EINVAL, ret = 0;
 
 	uaudio_dbg("sq_node:%x sq_port:%x sq_family:%x\n", sq->sq_node,
@@ -1355,6 +1349,9 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 	}
 
 	req_msg = (struct qmi_uaudio_stream_req_msg_v01 *)decoded_msg;
+	direction = req_msg->usb_token & SND_PCM_STREAM_DIRECTION;
+	pcm_dev_num = (req_msg->usb_token & SND_PCM_DEV_NUM_MASK) >> 8;
+	pcm_card_num = (req_msg->usb_token & SND_PCM_CARD_NUM_MASK) >> 16;
 	if (!req_msg->audio_format_valid || !req_msg->bit_rate_valid ||
 	!req_msg->number_of_ch_valid || !req_msg->xfer_buff_size_valid) {
 		uaudio_err("invalid request msg\n");
@@ -1362,16 +1359,17 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 		goto response;
 	}
 
-	direction = req_msg->usb_token & SND_PCM_STREAM_DIRECTION;
-	pcm_dev_num = (req_msg->usb_token & SND_PCM_DEV_NUM_MASK) >> 8;
-	pcm_card_num = (req_msg->usb_token & SND_PCM_CARD_NUM_MASK) >> 16;
+	ret = __handle_uaudio_stream_req(req_msg, &info_idx);
+	if (ret)
+		goto response;
 
 	subs = find_substream(pcm_card_num, pcm_dev_num, direction);
 	chip = uadev[pcm_card_num].chip;
 
-	ret = __handle_uaudio_stream_req(req_msg, &info_idx);
-	if (ret)
+	if (!subs || !chip) {
+		ret = -ENODEV;
 		goto response;
+	}
 
 	if (req_msg->service_interval_valid) {
 		ret = get_data_interval_from_si(subs,
@@ -1393,9 +1391,12 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 				map_pcm_format(req_msg->audio_format),
 				req_msg->number_of_ch, req_msg->bit_rate,
 				datainterval);
-		if (!ret)
+		if (!ret) {
 			ret = prepare_qmi_response(subs, req_msg, &resp,
 					info_idx);
+			if (ret)
+				disable_audio_stream(subs);
+		}
 	} else {
 		info = &uadev[pcm_card_num].info[info_idx];
 		if (info->data_ep_pipe) {
@@ -1447,6 +1448,9 @@ response:
 	resp.internal_status_valid = 1;
 	resp.status = ret ? USB_AUDIO_STREAM_REQ_FAILURE_V01 : ret;
 	resp.status_valid = 1;
+	if (ret)
+		uaudio_err("USB stream card#%u dev#%u dir%u enable%u failed: %d\n",
+			pcm_card_num, pcm_dev_num, direction, req_msg->enable, ret);
 	ret = qmi_send_response(svc->uaudio_svc_hdl, sq, txn,
 			QMI_UAUDIO_STREAM_RESP_V01,
 			QMI_UAUDIO_STREAM_RESP_MSG_V01_MAX_MSG_LEN,
