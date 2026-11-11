@@ -37,9 +37,13 @@ struct xhci_ring *xhci_sec_event_ring_setup(struct usb_device *udev,
 	if (udev->state == USB_STATE_NOTATTACHED || !HCD_RH_RUNNING(hcd))
 		return ERR_PTR(-ENODEV);
 	/* Firmware chooses the interrupter; zero is the primary ring. */
-	if (!intr_num || intr_num >= xhci->max_interrupters ||
-	    (xhci->xhc_state & XHCI_STATE_HALTED))
+	if (!intr_num || intr_num >= xhci->max_interrupters) {
+		xhci_err(xhci, "audio interrupter %u outside allocated count %u\n",
+			 intr_num, xhci->max_interrupters);
 		return ERR_PTR(-EINVAL);
+	}
+	if (xhci->xhc_state & XHCI_STATE_HALTED)
+		return ERR_PTR(-ENODEV);
 
 	mutex_lock(&xhci_sec_lock);
 	list_for_each_entry(sec, &xhci_sec, list) {
