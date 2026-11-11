@@ -3845,11 +3845,13 @@ static void mmi_basic_charge_sm(struct smb_mmi_charger *chip,
 		stepchg_str[(int)prm->pres_chrg_step],
 		prm->pres_temp_zone,
 		prm->batt_health);
-	mmi_info(chip, "IMPOSED: FV = %d, CDIS = %d, FCC = %d, USBICL = %d\n",
+	mmi_info(chip, "IMPOSED: FV = %d, CDIS = %d, FCC = %d (%s), USBICL = %d (%s)\n",
 		get_effective_result(chip->fv_votable),
 		get_effective_result(chip->chg_dis_votable),
 		get_effective_result(chip->fcc_votable),
-		get_effective_result(chip->usb_icl_votable));
+		get_effective_client(chip->fcc_votable),
+		get_effective_result(chip->usb_icl_votable),
+		get_effective_client(chip->usb_icl_votable));
 }
 
 static void smb_mmi_awake_vote(struct smb_mmi_charger *chip, bool awake)
