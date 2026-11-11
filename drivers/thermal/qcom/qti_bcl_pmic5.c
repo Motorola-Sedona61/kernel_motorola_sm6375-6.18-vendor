@@ -468,6 +468,13 @@ set_trip_exit:
 	return ret;
 }
 
+static bool bcl_uses_one_byte_regs(const struct bcl_device *bcl_perph)
+{
+	/* Pre-Gen4 BCL keeps the signed 8-bit IBAT and 8-bit VBAT format. */
+	return bcl_perph->dig_major < BCL_GEN4_MAJOR_REV ||
+		bcl_perph->desc->one_byte_reg;
+}
+
 static int bcl_read_ibat(struct thermal_zone_device *tz, int *adc_value)
 {
 	int ret = 0;
@@ -477,7 +484,7 @@ static int bcl_read_ibat(struct thermal_zone_device *tz, int *adc_value)
 	struct bcl_device *bcl_perph = (struct bcl_device *)bat_data->dev;
 
 	*adc_value = val;
-	if (bcl_perph->desc->one_byte_reg)
+	if (bcl_uses_one_byte_regs(bcl_perph))
 		ret = bcl_read_register(bat_data->dev, BCL_IBAT_READ, &val);
 	else
 		ret = bcl_read_multi_register(bat_data->dev, BCL_IBAT_READ, &val, 2);
@@ -486,7 +493,7 @@ static int bcl_read_ibat(struct thermal_zone_device *tz, int *adc_value)
 		return ret;
 
 	/* IBat ADC reading is in 2's compliment form */
-	if (bcl_perph->desc->one_byte_reg)
+	if (bcl_uses_one_byte_regs(bcl_perph))
 		*adc_value = sign_extend32(val, 7);
 	else
 		*adc_value = sign_extend32(val, 15);
@@ -548,7 +555,7 @@ static int bcl_read_vbat_tz(struct thermal_zone_device *tzd, int *adc_value)
 	}
 
 	*adc_value = val;
-	if (bcl_perph->desc->one_byte_reg)
+	if (bcl_uses_one_byte_regs(bcl_perph))
 		ret = bcl_read_register(bat_data->dev, BCL_VBAT_READ, &val);
 	else
 		ret = bcl_read_multi_register(bat_data->dev, BCL_VBAT_READ,
@@ -558,13 +565,13 @@ static int bcl_read_vbat_tz(struct thermal_zone_device *tzd, int *adc_value)
 		return ret;
 
 	*adc_value = val;
-	if ((bcl_perph->desc->one_byte_reg &&
+	if ((bcl_uses_one_byte_regs(bcl_perph) &&
 			*adc_value == BCL_VBAT_NO_READING) ||
-		(!(bcl_perph->desc->one_byte_reg) &&
+		(!bcl_uses_one_byte_regs(bcl_perph) &&
 			*adc_value == BCL_VBAT_4G_NO_READING)) {
 		*adc_value = bat_data->last_val;
 	} else {
-		if (bcl_perph->desc->one_byte_reg)
+		if (bcl_uses_one_byte_regs(bcl_perph))
 			convert_adc_to_vbat_val(adc_value,
 				bat_data->dev->desc->vbat_scaling_factor,
 				bat_data->dev->desc->batt_conf_valid);
