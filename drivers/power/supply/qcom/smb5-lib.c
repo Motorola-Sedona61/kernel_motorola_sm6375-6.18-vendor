@@ -2633,6 +2633,14 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 	if (val->intval > chg->thermal_levels)
 		return -EINVAL;
 
+	if (chg->system_temp_level != val->intval)
+		pr_info("%s: %s: %s[%d] thermal level %d -> %d/%d, FCC request %d uA (-1=clear, 0=disable)\n",
+			chg->name, __func__, current->comm, task_pid_nr(current),
+			chg->system_temp_level, val->intval, chg->thermal_levels,
+			val->intval == chg->thermal_levels ? 0 :
+			val->intval == 0 ? -1 :
+			chg->thermal_mitigation[val->intval]);
+
 	chg->system_temp_level = val->intval;
 
 	if (chg->system_temp_level == chg->thermal_levels)
