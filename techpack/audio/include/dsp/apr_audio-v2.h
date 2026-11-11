@@ -661,7 +661,7 @@ struct adm_cmd_set_pp_params {
 	 * Use q6core_pack_pp_params to pack the header and data correctly
 	 * depending on Instance ID support.
 	 */
-	u8 param_data[0];
+	u8 param_data[];
 } __packed;
 
 
@@ -2251,7 +2251,7 @@ struct afe_port_cmd_set_param_v2 {
 	struct mem_mapping_hdr mem_hdr;
 
 	/* The parameter data to be filled when sent inband */
-	u8 param_data[0];
+	u8 param_data[];
 } __packed;
 
 #define AFE_PORT_CMD_SET_PARAM_V3 0x000100FA
@@ -2278,7 +2278,7 @@ struct afe_port_cmd_set_param_v3 {
 	 * The parameter data to be filled when sent inband.
 	 * Must include param_hdr packed correctly.
 	 */
-	u8 param_data[0];
+	u8 param_data[];
 } __packed;
 
 /* Payload of the #AFE_PARAM_ID_LOOPBACK_GAIN_PER_PATH parameter,
@@ -12780,7 +12780,7 @@ struct afe_svc_cmd_set_param_v1 {
 	struct mem_mapping_hdr mem_hdr;
 
 	/* The parameter data to be filled when sent inband */
-	u32 param_data[0];
+	u32 param_data[];
 } __packed;
 
 struct afe_svc_cmd_set_param_v2 {
@@ -12794,7 +12794,7 @@ struct afe_svc_cmd_set_param_v2 {
 	u32 payload_size;
 
 	/* The parameter data to be filled when sent inband */
-	u32 param_data[0];
+	u32 param_data[];
 } __packed;
 
 struct afe_param_hw_mad_ctrl {

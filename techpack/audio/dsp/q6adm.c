@@ -23,6 +23,9 @@
 #include "adsp_err.h"
 #include <soc/qcom/secure_buffer.h>
 
+static_assert(sizeof(struct adm_cmd_set_pp_params) ==
+	      offsetof(struct adm_cmd_set_pp_params, param_data));
+
 #define TIMEOUT_MS 1000
 
 #define RESET_COPP_ID 99
@@ -1079,8 +1082,11 @@ int adm_set_pp_params(int port_id, int copp_idx,
 
 	/* Only add params_size in inband case */
 	size = sizeof(struct adm_cmd_set_pp_params);
-	if (param_data != NULL)
+	if (param_data != NULL) {
+		if (param_size > U16_MAX - size)
+			return -EINVAL;
 		size += param_size;
+	}
 	adm_set_params = kzalloc(size, GFP_KERNEL);
 	if (!adm_set_params)
 		return -ENOMEM;
@@ -1115,7 +1121,7 @@ int adm_set_pp_params(int port_id, int copp_idx,
 		 * q6common_pack_pp_params to pack parameter data and header
 		 * correctly.
 		 */
-		memcpy(&adm_set_params->param_data, param_data, param_size);
+		memcpy(adm_set_params->param_data, param_data, param_size);
 	} else {
 		pr_err("%s: Received NULL pointers for both memory header and param data\n",
 		       __func__);

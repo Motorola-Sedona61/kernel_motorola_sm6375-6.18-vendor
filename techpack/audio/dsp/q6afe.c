@@ -24,6 +24,18 @@
 #include "adsp_err.h"
 #include "q6afecal-hwdep.h"
 
+static_assert(sizeof(struct afe_port_cmd_set_param_v2) ==
+	      offsetof(struct afe_port_cmd_set_param_v2, param_data));
+
+static_assert(sizeof(struct afe_port_cmd_set_param_v3) ==
+	      offsetof(struct afe_port_cmd_set_param_v3, param_data));
+
+static_assert(sizeof(struct afe_svc_cmd_set_param_v1) ==
+	      offsetof(struct afe_svc_cmd_set_param_v1, param_data));
+
+static_assert(sizeof(struct afe_svc_cmd_set_param_v2) ==
+	      offsetof(struct afe_svc_cmd_set_param_v2, param_data));
+
 #ifdef CONFIG_SND_SOC_FS1815
 #include <dsp/q6fsm-v3.h>
 #endif
@@ -1728,8 +1740,11 @@ static int q6afe_set_params_v2(u16 port_id, int index,
 	uint32_t size = sizeof(struct afe_port_cmd_set_param_v2);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	set_param = kzalloc(size, GFP_KERNEL);
 	if (set_param == NULL)
 		return -ENOMEM;
@@ -1753,7 +1768,7 @@ static int q6afe_set_params_v2(u16 port_id, int index,
 	if (mem_hdr != NULL) {
 		set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
-		memcpy(&set_param->param_data, packed_param_data,
+		memcpy(set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
@@ -1777,8 +1792,11 @@ static int q6afe_set_params_v3(u16 port_id, int index,
 	uint32_t size = sizeof(struct afe_port_cmd_set_param_v3);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	set_param = kzalloc(size, GFP_KERNEL);
 	if (set_param == NULL)
 		return -ENOMEM;
@@ -1796,7 +1814,7 @@ static int q6afe_set_params_v3(u16 port_id, int index,
 	if (mem_hdr != NULL) {
 		set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
-		memcpy(&set_param->param_data, packed_param_data,
+		memcpy(set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
@@ -2031,8 +2049,11 @@ static int q6afe_svc_set_params_v1(int index, struct mem_mapping_hdr *mem_hdr,
 	uint32_t size = sizeof(struct afe_svc_cmd_set_param_v1);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	svc_set_param = kzalloc(size, GFP_KERNEL);
 	if (svc_set_param == NULL)
 		return -ENOMEM;
@@ -2052,7 +2073,7 @@ static int q6afe_svc_set_params_v1(int index, struct mem_mapping_hdr *mem_hdr,
 		svc_set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
 		/* In band case. */
-		memcpy(&svc_set_param->param_data, packed_param_data,
+		memcpy(svc_set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
@@ -2075,11 +2096,14 @@ static int q6afe_svc_set_params_v2(int index, struct mem_mapping_hdr *mem_hdr,
 				   u8 *packed_param_data, u32 packed_data_size)
 {
 	struct afe_svc_cmd_set_param_v2 *svc_set_param = NULL;
-	uint16_t size = sizeof(struct afe_svc_cmd_set_param_v2);
+	uint32_t size = sizeof(struct afe_svc_cmd_set_param_v2);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	svc_set_param = kzalloc(size, GFP_KERNEL);
 	if (svc_set_param == NULL)
 		return -ENOMEM;
@@ -2099,7 +2123,7 @@ static int q6afe_svc_set_params_v2(int index, struct mem_mapping_hdr *mem_hdr,
 		svc_set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
 		/* In band case. */
-		memcpy(&svc_set_param->param_data, packed_param_data,
+		memcpy(svc_set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
@@ -2125,8 +2149,11 @@ static int q6afe_clk_set_params_v1(int index, struct mem_mapping_hdr *mem_hdr,
 	uint32_t size = sizeof(struct afe_svc_cmd_set_param_v1);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	svc_set_param = kzalloc(size, GFP_KERNEL);
 	if (svc_set_param == NULL)
 		return -ENOMEM;
@@ -2146,7 +2173,7 @@ static int q6afe_clk_set_params_v1(int index, struct mem_mapping_hdr *mem_hdr,
 		svc_set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
 		/* In band case. */
-		memcpy(&svc_set_param->param_data, packed_param_data,
+		memcpy(svc_set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
@@ -2169,11 +2196,14 @@ static int q6afe_clk_set_params_v2(int index, struct mem_mapping_hdr *mem_hdr,
 				   u8 *packed_param_data, u32 packed_data_size)
 {
 	struct afe_svc_cmd_set_param_v2 *svc_set_param = NULL;
-	uint16_t size = sizeof(struct afe_svc_cmd_set_param_v2);
+	uint32_t size = sizeof(struct afe_svc_cmd_set_param_v2);
 	int rc = 0;
 
-	if (packed_param_data != NULL)
+	if (packed_param_data != NULL) {
+		if (packed_data_size > U16_MAX - size)
+			return -EINVAL;
 		size += packed_data_size;
+	}
 	svc_set_param = kzalloc(size, GFP_KERNEL);
 	if (svc_set_param == NULL)
 		return -ENOMEM;
@@ -2193,7 +2223,7 @@ static int q6afe_clk_set_params_v2(int index, struct mem_mapping_hdr *mem_hdr,
 		svc_set_param->mem_hdr = *mem_hdr;
 	} else if (packed_param_data != NULL) {
 		/* In band case. */
-		memcpy(&svc_set_param->param_data, packed_param_data,
+		memcpy(svc_set_param->param_data, packed_param_data,
 		       packed_data_size);
 	} else {
 		pr_err("%s: Both memory header and param data are NULL\n",
