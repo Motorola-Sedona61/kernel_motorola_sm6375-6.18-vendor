@@ -148,6 +148,8 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 		raw_spin_lock(&next->pi_lock);
 		raw_spin_rq_lock(rq);
 		rq_repin_lock(rq, rf);
+		/* The lock was dropped: refresh before DEQUEUE_NOCLOCK migration. */
+		update_rq_clock(rq);
 
 		/*
 		 * Since we're inside stop-machine, _nothing_ should have
@@ -172,6 +174,7 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf)
 				*rf = orf;
 				raw_spin_rq_lock(rq);
 				rq_repin_lock(rq, rf);
+				update_rq_clock(rq);
 			}
 		} else {
 			detach_one_task_core(next, rq, &percpu_kthreads);
