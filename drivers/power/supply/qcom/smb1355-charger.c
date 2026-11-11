@@ -21,6 +21,7 @@
 #include <linux/regulator/of_regulator.h>
 #include <linux/power_supply.h>
 #include <linux/qti_power_supply.h>
+#include "qti-health-iio.h"
 #include <linux/workqueue.h>
 #include <linux/pmic-voter.h>
 #include <linux/string.h>
@@ -1056,6 +1057,8 @@ static int smb1355_iio_read_raw(struct iio_dev *indio_dev,
 		return -ENODATA;
 	}
 
+	if (qti_iio_is_health_channel(chan->channel))
+		*val1 = qti_iio_health_encode(*val1);
 	return IIO_VAL_INT;
 }
 
@@ -1066,6 +1069,11 @@ static int smb1355_iio_write_raw(struct iio_dev *indio_dev,
 	struct smb1355 *chip = iio_priv(indio_dev);
 	int rc = 0;
 
+	if (qti_iio_is_health_channel(chan->channel) && val1 != -EINVAL) {
+		val1 = qti_iio_health_decode(val1);
+		if (val1 < 0)
+			return val1;
+	}
 	mutex_lock(&chip->suspend_lock);
 	if (chip->suspended) {
 		pr_debug("SMB1355 IIO write channel %d\n",

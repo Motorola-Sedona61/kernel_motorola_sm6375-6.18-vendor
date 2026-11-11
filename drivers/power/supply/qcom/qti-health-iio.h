@@ -1,0 +1,116 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+#ifndef _QTI_HEALTH_IIO_H
+#define _QTI_HEALTH_IIO_H
+
+#include <linux/errno.h>
+#include <linux/power_supply.h>
+#include <dt-bindings/iio/qti_power_supply_iio.h>
+
+/* Frozen numeric ABI consumed by the stock 6.1 Qualcomm charger daemon.
+ * Keep native power_supply health values inside the drivers. In particular,
+ * native UNDERVOLTAGE must not shift COOL into the daemon's HOT value.
+ */
+enum qti_iio_health {
+	QTI_IIO_HEALTH_UNKNOWN = 0,
+	QTI_IIO_HEALTH_GOOD = 1,
+	QTI_IIO_HEALTH_OVERHEAT = 2,
+	QTI_IIO_HEALTH_DEAD = 3,
+	QTI_IIO_HEALTH_OVERVOLTAGE = 4,
+	QTI_IIO_HEALTH_UNSPEC_FAILURE = 5,
+	QTI_IIO_HEALTH_COLD = 6,
+	QTI_IIO_HEALTH_WATCHDOG_TIMER_EXPIRE = 7,
+	QTI_IIO_HEALTH_SAFETY_TIMER_EXPIRE = 8,
+	QTI_IIO_HEALTH_OVERCURRENT = 9,
+	QTI_IIO_HEALTH_CALIBRATION_REQUIRED = 10,
+	QTI_IIO_HEALTH_WARM = 11,
+	QTI_IIO_HEALTH_COOL = 12,
+	QTI_IIO_HEALTH_HOT = 13,
+};
+
+static inline bool qti_iio_is_health_channel(int channel)
+{
+	switch (channel) {
+	case PSY_IIO_CONNECTOR_HEALTH:
+	case PSY_IIO_SKIN_HEALTH:
+	case PSY_IIO_HEALTH:
+	case PSY_IIO_DIE_HEALTH:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static inline int qti_iio_health_encode(int health)
+{
+	switch (health) {
+	case POWER_SUPPLY_HEALTH_UNKNOWN:
+		return QTI_IIO_HEALTH_UNKNOWN;
+	case POWER_SUPPLY_HEALTH_GOOD:
+		return QTI_IIO_HEALTH_GOOD;
+	case POWER_SUPPLY_HEALTH_OVERHEAT:
+		return QTI_IIO_HEALTH_OVERHEAT;
+	case POWER_SUPPLY_HEALTH_DEAD:
+		return QTI_IIO_HEALTH_DEAD;
+	case POWER_SUPPLY_HEALTH_OVERVOLTAGE:
+		return QTI_IIO_HEALTH_OVERVOLTAGE;
+	case POWER_SUPPLY_HEALTH_UNSPEC_FAILURE:
+		return QTI_IIO_HEALTH_UNSPEC_FAILURE;
+	case POWER_SUPPLY_HEALTH_COLD:
+		return QTI_IIO_HEALTH_COLD;
+	case POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE:
+		return QTI_IIO_HEALTH_WATCHDOG_TIMER_EXPIRE;
+	case POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE:
+		return QTI_IIO_HEALTH_SAFETY_TIMER_EXPIRE;
+	case POWER_SUPPLY_HEALTH_OVERCURRENT:
+		return QTI_IIO_HEALTH_OVERCURRENT;
+	case POWER_SUPPLY_HEALTH_CALIBRATION_REQUIRED:
+		return QTI_IIO_HEALTH_CALIBRATION_REQUIRED;
+	case POWER_SUPPLY_HEALTH_WARM:
+		return QTI_IIO_HEALTH_WARM;
+	case POWER_SUPPLY_HEALTH_COOL:
+		return QTI_IIO_HEALTH_COOL;
+	case POWER_SUPPLY_HEALTH_HOT:
+		return QTI_IIO_HEALTH_HOT;
+	default:
+		/* New native fault states have no legacy representation. */
+		return QTI_IIO_HEALTH_UNSPEC_FAILURE;
+	}
+}
+
+static inline int qti_iio_health_decode(int health)
+{
+	switch (health) {
+	case QTI_IIO_HEALTH_UNKNOWN:
+		return POWER_SUPPLY_HEALTH_UNKNOWN;
+	case QTI_IIO_HEALTH_GOOD:
+		return POWER_SUPPLY_HEALTH_GOOD;
+	case QTI_IIO_HEALTH_OVERHEAT:
+		return POWER_SUPPLY_HEALTH_OVERHEAT;
+	case QTI_IIO_HEALTH_DEAD:
+		return POWER_SUPPLY_HEALTH_DEAD;
+	case QTI_IIO_HEALTH_OVERVOLTAGE:
+		return POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+	case QTI_IIO_HEALTH_UNSPEC_FAILURE:
+		return POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+	case QTI_IIO_HEALTH_COLD:
+		return POWER_SUPPLY_HEALTH_COLD;
+	case QTI_IIO_HEALTH_WATCHDOG_TIMER_EXPIRE:
+		return POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE;
+	case QTI_IIO_HEALTH_SAFETY_TIMER_EXPIRE:
+		return POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE;
+	case QTI_IIO_HEALTH_OVERCURRENT:
+		return POWER_SUPPLY_HEALTH_OVERCURRENT;
+	case QTI_IIO_HEALTH_CALIBRATION_REQUIRED:
+		return POWER_SUPPLY_HEALTH_CALIBRATION_REQUIRED;
+	case QTI_IIO_HEALTH_WARM:
+		return POWER_SUPPLY_HEALTH_WARM;
+	case QTI_IIO_HEALTH_COOL:
+		return POWER_SUPPLY_HEALTH_COOL;
+	case QTI_IIO_HEALTH_HOT:
+		return POWER_SUPPLY_HEALTH_HOT;
+	default:
+		return -EINVAL;
+	}
+}
+
+#endif

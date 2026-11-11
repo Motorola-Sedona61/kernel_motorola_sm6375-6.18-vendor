@@ -24,6 +24,7 @@
 #include "smb5-reg.h"
 #include "smb5-lib.h"
 #include "smb5-iio.h"
+#include "qti-health-iio.h"
 #include "schgm-flash.h"
 
 static struct smb_params smb5_pmi632_params = {
@@ -3063,8 +3064,12 @@ static int smb5_read_raw(struct iio_dev *indio_dev,
 {
 	struct smb5 *iio_chip = iio_priv(indio_dev);
 	struct smb_charger *chg = &iio_chip->chg;
+	int rc;
 
-	return smb5_iio_get_prop(chg, chan->channel, val);
+	rc = smb5_iio_get_prop(chg, chan->channel, val);
+	if (rc >= 0 && qti_iio_is_health_channel(chan->channel))
+		*val = qti_iio_health_encode(*val);
+	return rc;
 }
 
 static int smb5_write_raw(struct iio_dev *indio_dev,
@@ -3074,6 +3079,11 @@ static int smb5_write_raw(struct iio_dev *indio_dev,
 	struct smb5 *iio_chip = iio_priv(indio_dev);
 	struct smb_charger *chg = &iio_chip->chg;
 
+	if (qti_iio_is_health_channel(chan->channel) && val != -EINVAL) {
+		val = qti_iio_health_decode(val);
+		if (val < 0)
+			return val;
+	}
 	return smb5_iio_set_prop(chg, chan->channel, val);
 }
 
