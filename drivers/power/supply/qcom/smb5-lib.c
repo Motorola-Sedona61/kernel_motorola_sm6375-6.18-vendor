@@ -4647,7 +4647,15 @@ int smblib_set_prop_sdp_current_max(struct smb_charger *chg,
 		}
 
 		/* handle the request only when USB is present */
-		if (pval.intval)
+		if (pval.intval &&
+		    (chg->real_charger_type == QTI_POWER_SUPPLY_TYPE_USB_HVDCP ||
+		     chg->real_charger_type == QTI_POWER_SUPPLY_TYPE_USB_HVDCP_3 ||
+		     chg->real_charger_type == QTI_POWER_SUPPLY_TYPE_USB_HVDCP_3P5)) {
+			/* QC input current is owned by charger negotiation. A late
+			 * USB enumeration update must not restore the old SDP vote.
+			 */
+			rc = vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
+		} else if (pval.intval)
 			rc = smblib_handle_usb_current(chg, val);
 	} else if (chg->system_suspend_supported) {
 		if (val <= USBIN_25MA)
@@ -6205,8 +6213,13 @@ static void update_sw_icl_max(struct smb_charger *chg, int val)
 	 * HVDCP 2/3, handled separately
 	 */
 	if (val == QTI_POWER_SUPPLY_TYPE_USB_HVDCP
-			|| val == QTI_POWER_SUPPLY_TYPE_USB_HVDCP_3)
+			|| val == QTI_POWER_SUPPLY_TYPE_USB_HVDCP_3) {
+		/* The initial APSD result may have been SDP. Drop only its
+		 * enumeration vote now that QC owns the input-current limit.
+		 */
+		vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
 		return;
+	}
 
 	/* TypeC rp med or high, use rp value */
 	typec_mode = smblib_get_prop_typec_mode(chg);
