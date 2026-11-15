@@ -158,6 +158,25 @@ static void drm_mode_to_intf_timing_params(
 		width = drm_fixp_div(width, comp_ratio);
 		timing->width = drm_fixp2int_ceil(width);
 		timing->xres = timing->width;
+
+		/*
+		 * Without widebus, MDP sends and DSI consumes 24 bits of
+		 * compressed data per pclk, so the DSI controller times a line
+		 * as DIV_ROUND_UP(compressed bytes, 3) pclks (see
+		 * sde_dsc_populate_dsc_private_params()). The source/target
+		 * bpp ratio only gives that width for 8 bpc sources. For a
+		 * 10 bpc, 8 bpp DSC panel it gives 1080 / 3.75 = 288 instead
+		 * of 360, so the INTF timing engine runs ahead of the DSI
+		 * timing and the stream overflows the DSI FIFO as soon as the
+		 * INTF is reprogrammed (panel on or a dynamic fps switch).
+		 */
+		if (vid_enc->base.comp_type == MSM_DISPLAY_COMPRESSION_DSC &&
+				!timing->wide_bus_en &&
+				vid_enc->base.dce_bytes_per_line) {
+			timing->width = DIV_ROUND_UP(
+					vid_enc->base.dce_bytes_per_line, 3);
+			timing->xres = timing->width;
+		}
 	}
 
 	/*
