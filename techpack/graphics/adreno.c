@@ -1047,8 +1047,15 @@ const char *adreno_get_gpu_model(struct kgsl_device *device)
 	if (!ret)
 		goto done;
 
+	/*
+	 * socinfo returns a pointer into its partinfo table, which holds an
+	 * empty name when SMEM carries no GPU part info (blair/holi). An empty
+	 * model leaves the Adreno UMD without a GPU number ("Adreno (TM) "),
+	 * and clients that match on it, such as the ArcSoft camera
+	 * libraries, reject the GPU. Fall back to the chip ID name instead.
+	 */
 	model = socinfo_get_partinfo_part_name(SOCINFO_PART_GPU);
-	if (model)
+	if (model && model[0])
 		goto done;
 
 	scnprintf(gpu_model, sizeof(gpu_model), "Adreno%u%u%uv%u",
