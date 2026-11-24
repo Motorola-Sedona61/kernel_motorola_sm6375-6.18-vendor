@@ -38,6 +38,8 @@ struct thermal_pause_cdev {
 };
 
 static DEFINE_MUTEX(cpus_pause_lock);
+/* Serialize cooling transitions while CPU hotplug callbacks take cpus_pause_lock. */
+static DEFINE_MUTEX(cpus_transition_lock);
 static LIST_HEAD(thermal_pause_cdev_list);
 
 static struct cpumask cpus_in_max_cooling_level;
@@ -62,6 +64,63 @@ const struct cpumask *thermal_paused_cpumask(void)
 	return &cpus_in_max_cooling_level;
 }
 EXPORT_SYMBOL_GPL(thermal_paused_cpumask);
+
+#if IS_ENABLED(CONFIG_SCHED_WALT)
+static int thermal_pause_cpus(struct cpumask *cpus)
+{
+	return walt_pause_cpus(cpus, PAUSE_THERMAL);
+}
+
+static int thermal_resume_cpus(struct cpumask *cpus)
+{
+	return walt_resume_cpus(cpus, PAUSE_THERMAL);
+}
+#else
+static cpumask_t cpus_offlined_by_thermal;
+
+static int thermal_resume_cpus(struct cpumask *cpus)
+{
+	unsigned int cpu;
+	int ret = 0, err;
+
+	for_each_cpu_and(cpu, cpus, &cpus_offlined_by_thermal) {
+		err = cpu_online(cpu) ? 0 : add_cpu(cpu);
+		if (err < 0) {
+			ret = err;
+			continue;
+		}
+		cpumask_clear_cpu(cpu, &cpus_offlined_by_thermal);
+	}
+
+	return ret;
+}
+
+static int thermal_pause_cpus(struct cpumask *cpus)
+{
+	cpumask_t newly_offlined;
+	unsigned int cpu;
+	int ret;
+
+	cpumask_clear(&newly_offlined);
+	for_each_cpu(cpu, cpus) {
+		if (!cpu || !cpu_online(cpu) || num_online_cpus() <= 1)
+			continue;
+
+		ret = remove_cpu(cpu);
+		if (ret < 0) {
+			if (thermal_resume_cpus(&newly_offlined))
+				pr_warn("Could not roll back CPU hotplug after pause failure\n");
+			return ret;
+		}
+		if (ret == 0) {
+			cpumask_set_cpu(cpu, &newly_offlined);
+			cpumask_set_cpu(cpu, &cpus_offlined_by_thermal);
+		}
+	}
+
+	return 0;
+}
+#endif
 
 static int thermal_pause_hp_online(unsigned int online_cpu)
 {
@@ -102,7 +161,7 @@ static int thermal_pause_work(struct thermal_pause_cdev *thermal_pause_cdev)
 	pr_debug("Pause:%*pbl\n", cpumask_pr_args(&thermal_pause_cdev->cpu_mask));
 
 	mutex_unlock(&cpus_pause_lock);
-	ret = walt_pause_cpus(&cpus_to_pause, PAUSE_THERMAL);
+	ret = thermal_pause_cpus(&cpus_to_pause);
 	mutex_lock(&cpus_pause_lock);
 
 	if (ret == 0) {
@@ -145,22 +204,23 @@ static int thermal_resume_work(struct thermal_pause_cdev *thermal_pause_cdev)
 	cpumask_t cpus_to_unpause, new_paused_cpus, cpus_to_notify;
 	struct thermal_pause_cdev *cdev;
 
+	cpumask_clear(&new_paused_cpus);
+	list_for_each_entry(cdev, &thermal_pause_cdev_list, node) {
+		if (!cdev->thermal_pause_level || cdev == thermal_pause_cdev)
+			continue;
+		cpumask_or(&new_paused_cpus, &new_paused_cpus, &cdev->cpu_mask);
+	}
+
 	cpumask_copy(&cpus_to_unpause, &thermal_pause_cdev->cpu_mask);
+	if (!IS_ENABLED(CONFIG_SCHED_WALT))
+		cpumask_andnot(&cpus_to_unpause, &cpus_to_unpause, &new_paused_cpus);
 	pr_debug("Unpause:%*pbl\n", cpumask_pr_args(&cpus_to_unpause));
 
 	mutex_unlock(&cpus_pause_lock);
-	ret = walt_resume_cpus(&cpus_to_unpause, PAUSE_THERMAL);
+	ret = thermal_resume_cpus(&cpus_to_unpause);
 	mutex_lock(&cpus_pause_lock);
 
 	if (ret == 0) {
-		/* gather up the cpus paused state from all the cdevs */
-		cpumask_clear(&new_paused_cpus);
-		list_for_each_entry(cdev, &thermal_pause_cdev_list, node) {
-			if (!cdev->thermal_pause_level || cdev == thermal_pause_cdev)
-				continue;
-			cpumask_or(&new_paused_cpus, &new_paused_cpus, &cdev->cpu_mask);
-		}
-
 		/* remove CPUs that will remain paused */
 		cpumask_andnot(&cpus_to_notify, &cpus_in_max_cooling_level, &new_paused_cpus);
 
@@ -205,6 +265,7 @@ static void thermal_pause_update_work(struct work_struct *work)
 	struct thermal_pause_cdev *thermal_pause_cdev =
 		container_of(work, struct thermal_pause_cdev, pause_update_work);
 
+	mutex_lock(&cpus_transition_lock);
 	mutex_lock(&cpus_pause_lock);
 
 retry:
@@ -240,6 +301,7 @@ retry:
 	}
 
 	mutex_unlock(&cpus_pause_lock);
+	mutex_unlock(&cpus_transition_lock);
 }
 
 /**
@@ -430,23 +492,29 @@ static void thermal_pause_remove(struct platform_device *pdev)
 		cpu_hp_online = 0;
 	}
 
-	mutex_lock(&cpus_pause_lock);
-	list_for_each_entry_safe(thermal_pause_cdev, next,
-			&thermal_pause_cdev_list, node) {
-
-		/* for each asserted cooling device, resume the CPUs */
-		if (thermal_pause_cdev->thermal_pause_level) {
-			thermal_pause_cdev->thermal_pause_req = THERMAL_NO_CPU_PAUSE;
-			queue_work(system_highpri_wq, &thermal_pause_cdev->pause_update_work);
-		}
-
+	list_for_each_entry(thermal_pause_cdev, &thermal_pause_cdev_list, node) {
+		cancel_work_sync(&thermal_pause_cdev->reg_work);
 		if (thermal_pause_cdev->cdev)
 			thermal_cooling_device_unregister(
 					thermal_pause_cdev->cdev);
-		list_del(&thermal_pause_cdev->node);
 	}
 
-	mutex_unlock(&cpus_pause_lock);
+	list_for_each_entry_safe(thermal_pause_cdev, next,
+			&thermal_pause_cdev_list, node) {
+		cancel_work_sync(&thermal_pause_cdev->pause_update_work);
+		mutex_lock(&cpus_pause_lock);
+		thermal_pause_cdev->thermal_pause_req = THERMAL_NO_CPU_PAUSE;
+		mutex_unlock(&cpus_pause_lock);
+		thermal_pause_update_work(&thermal_pause_cdev->pause_update_work);
+		mutex_lock(&cpus_pause_lock);
+		list_del(&thermal_pause_cdev->node);
+		mutex_unlock(&cpus_pause_lock);
+	}
+
+#if !IS_ENABLED(CONFIG_SCHED_WALT)
+	if (thermal_resume_cpus(&cpus_offlined_by_thermal))
+		pr_warn("Could not restore all CPUs offlined by thermal cooling\n");
+#endif
 }
 
 static const struct of_device_id thermal_pause_match[] = {
