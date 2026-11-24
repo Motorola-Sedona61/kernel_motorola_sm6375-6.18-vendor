@@ -625,7 +625,6 @@ int msm_audio_ion_mmap(struct audio_buffer *abuff,
 	struct scatterlist *sg;
 	unsigned int i;
 	struct page *page;
-	int ret = 0;
 	bool found = false;
 	struct device *cb_dev = msm_audio_ion_data.cb_dev;
 
@@ -657,9 +656,11 @@ int msm_audio_ion_mmap(struct audio_buffer *abuff,
 	page = sg_page(table->sgl);
 	if (page) {
 		pr_debug("%s: page is NOT null\n", __func__);
-		for_each_sg(table->sgl, sg, table->nents, i) {
+		/* CPU mappings need the original entries before DMA merging. */
+		for_each_sgtable_sg(table, sg, i) {
 			unsigned long remainder = vma->vm_end - addr;
 			unsigned long len = sg->length;
+			int ret;
 
 			page = sg_page(sg);
 
@@ -677,18 +678,19 @@ int msm_audio_ion_mmap(struct audio_buffer *abuff,
 				(unsigned int)vma->vm_start,
 				(unsigned int)vma->vm_end,
 				(unsigned long)pgprot_val(vma->vm_page_prot));
-			remap_pfn_range(vma, addr, page_to_pfn(page), len,
-					vma->vm_page_prot);
+			ret = remap_pfn_range(vma, addr, page_to_pfn(page), len,
+					      vma->vm_page_prot);
+			if (ret)
+				return ret;
 			addr += len;
 			if (addr >= vma->vm_end)
 				return 0;
 		}
 	} else {
 		pr_debug("%s: page is NULL\n", __func__);
-		ret = -EINVAL;
 	}
 
-	return ret;
+	return -EINVAL;
 }
 EXPORT_SYMBOL(msm_audio_ion_mmap);
 
