@@ -3916,6 +3916,22 @@ static struct clk_branch gcc_venus_ctl_axi_clk = {
 	},
 };
 
+static struct clk_branch gcc_video_ahb_clk = {
+	.halt_reg = 0x17004,
+	.halt_check = BRANCH_HALT_VOTED,
+	.hwcg_reg = 0x17004,
+	.hwcg_bit = 1,
+	.clkr = {
+		.enable_reg = 0x17004,
+		.enable_mask = BIT(0),
+		.hw.init = &(const struct clk_init_data){
+			.name = "gcc_video_ahb_clk",
+			.flags = CLK_IS_CRITICAL,
+			.ops = &clk_branch2_ops,
+		},
+	},
+};
+
 static struct clk_branch gcc_video_axi0_clk = {
 	.halt_reg = 0x1701c,
 	.halt_check = BRANCH_HALT_VOTED,
@@ -4151,6 +4167,7 @@ static struct clk_regmap *gcc_blair_clocks[] = {
 	[GCC_VCODEC0_AXI_CLK] = &gcc_vcodec0_axi_clk.clkr,
 	[GCC_VENUS_AHB_CLK] = &gcc_venus_ahb_clk.clkr,
 	[GCC_VENUS_CTL_AXI_CLK] = &gcc_venus_ctl_axi_clk.clkr,
+	[GCC_VIDEO_AHB_CLK] = &gcc_video_ahb_clk.clkr,
 	[GCC_VIDEO_AXI0_CLK] = &gcc_video_axi0_clk.clkr,
 	[GCC_VIDEO_THROTTLE_CORE_CLK] = &gcc_video_throttle_core_clk.clkr,
 	[GCC_VIDEO_VCODEC0_SYS_CLK] = &gcc_video_vcodec0_sys_clk.clkr,
@@ -4265,7 +4282,7 @@ static int gcc_blair_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x1702c, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x36004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x79004, BIT(0), BIT(0));
-	regmap_update_bits(regmap, 0x17004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x17004, BIT(1) | BIT(0), BIT(1) | BIT(0));
 
 	clk_lucid_pll_configure(&gpll10, regmap, &gpll10_config);
 	clk_lucid_pll_configure(&gpll11, regmap, &gpll11_config);
