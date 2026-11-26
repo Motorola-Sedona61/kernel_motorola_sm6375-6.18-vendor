@@ -561,7 +561,7 @@ static int msm_vidc_load_regulator_table(
 		/* make sure prop isn't being misused */
 		regulator_node = of_parse_phandle(domains_parent_node,
 				domains_property->name, 0);
-		if (IS_ERR(regulator_node)) {
+		if (IS_ERR_OR_NULL(regulator_node)) {
 			d_vpr_e("%s is not a phandle\n",
 				domains_property->name);
 			continue;
@@ -570,6 +570,10 @@ static int msm_vidc_load_regulator_table(
 
 		/* populate regulator info */
 		rinfo = &regulators->regulator_tbl[regulators->count - 1];
+		rinfo->has_hw_power_collapse = of_property_read_bool(
+			regulator_node, "qcom,support-hw-trigger");
+		of_node_put(regulator_node);
+
 		rinfo->name = devm_kzalloc(&pdev->dev,
 			(supply - domains_property->name) + 1, GFP_KERNEL);
 		if (!rinfo->name) {
@@ -580,12 +584,33 @@ static int msm_vidc_load_regulator_table(
 		strscpy(rinfo->name, domains_property->name,
 			(supply - domains_property->name) + 1);
 
-		rinfo->has_hw_power_collapse = of_property_read_bool(
-			regulator_node, "qcom,support-hw-trigger");
-
 		d_vpr_h("Found regulator %s: h/w collapse = %s\n",
 				rinfo->name,
 				rinfo->has_hw_power_collapse ? "yes" : "no");
+	}
+
+	/*
+	 * Ensure parent/wrapper regulators (has_hw_power_collapse == false,
+	 * e.g. venus) always precede child core regulators (venus-core0),
+	 * even if DT overlays reversed raw property order in the FDT.
+	 */
+	if (regulators->count > 1) {
+		u32 i, j;
+
+		for (i = 1; i < regulators->count; i++) {
+			struct regulator_info tmp = regulators->regulator_tbl[i];
+
+			if (tmp.has_hw_power_collapse)
+				continue;
+			j = i;
+			while (j > 0 &&
+			       regulators->regulator_tbl[j - 1].has_hw_power_collapse) {
+				regulators->regulator_tbl[j] =
+					regulators->regulator_tbl[j - 1];
+				j--;
+			}
+			regulators->regulator_tbl[j] = tmp;
+		}
 	}
 
 	if (!regulators->count)
