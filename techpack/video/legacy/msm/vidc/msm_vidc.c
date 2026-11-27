@@ -1292,8 +1292,10 @@ static inline int vb2_bufq_init(struct msm_vidc_inst *inst,
 
 	if (type == OUTPUT_MPLANE) {
 		q = &inst->bufq[OUTPUT_PORT].vb2_bufq;
+		q->lock = &inst->bufq[OUTPUT_PORT].lock;
 	} else if (type == INPUT_MPLANE) {
 		q = &inst->bufq[INPUT_PORT].vb2_bufq;
+		q->lock = &inst->bufq[INPUT_PORT].lock;
 	} else {
 		s_vpr_e(inst->sid, "buf_type = %d not recognised\n", type);
 		return -EINVAL;
